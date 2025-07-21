@@ -1,8 +1,7 @@
 --[[
-    Flight Count Widget
+    Clock Widget
     Configurable Parameters (box table fields):
     -------------------------------------------
-    wakeupinterval      : number                    -- Optional wakeup interval in seconds (set in wrapper)
     title               : string                    -- (Optional) Title text
     titlepos            : string                    -- (Optional) Title position ("top" or "bottom")
     titlealign          : string                    -- (Optional) Title alignment ("center", "left", "right")
@@ -14,9 +13,8 @@
     titlepaddingright   : number                    -- (Optional) Right padding for title
     titlepaddingtop     : number                    -- (Optional) Top padding for title
     titlepaddingbottom  : number                    -- (Optional) Bottom padding for title
-    value               : any                       -- (Optional) Static value to display if not present
     novalue             : string                    -- (Optional) Text shown if value is missing (default: "-")
-    unit                : string                    -- (Optional) Unit label to append to value
+    unit                : string                    -- (Optional) Unit label to append to value or configure as "" to omit the unit from being displayed.
     font                : font                      -- (Optional) Value font (e.g., FONT_L, FONT_XL), dynamic by default
     valuealign          : string                    -- (Optional) Value alignment ("center", "left", "right")
     textcolor           : color                     -- (Optional) Value text color (theme/text fallback if nil)
@@ -33,52 +31,27 @@ local render = {}
 local utils = ofs3.widgets.dashboard.utils
 local getParam = utils.getParam
 local resolveThemeColor = utils.resolveThemeColor
-local lastDisplayValue = nil
 
 function render.dirty(box)
-    if not ofs3.session.telemetryState then return false end
-
+    -- Dirty if the displayed value has changed
     if box._lastDisplayValue == nil then
         box._lastDisplayValue = box._currentDisplayValue
         return true
     end
-
     if box._lastDisplayValue ~= box._currentDisplayValue then
         box._lastDisplayValue = box._currentDisplayValue
         return true
     end
-
     return false
 end
 
 function render.wakeup(box)
-    local value = ofs3.ini.getvalue(ofs3.session.modelPreferences, "general", "flightcount")
-    local unit = getParam(box, "unit")
-    local displayValue
+    -- Always use system time
+    local now = os.time()
+    local t = os.date("*t", now)
+    local displayValue = string.format("%02d:%02d:%02d", t.hour, t.min, t.sec)
 
-    -- Detect telemetry state (true if session exists and is connected)
-    local telemetryActive = ofs3.session and ofs3.session.isConnected
-
-    -- Only cache when we receive a valid number *and* telemetry is active
-    if type(value) == "number" and telemetryActive then
-        box._lastValidFlightCount = value
-    end
-
-    if type(value) == "number" then
-        displayValue = tostring(value)
-    elseif box._lastValidFlightCount ~= nil then
-        displayValue = tostring(box._lastValidFlightCount)
-    else
-        -- Animated "..." indicator when no flight count is available ever
-        local maxDots = 3
-        if box._dotCount == nil then box._dotCount = 0 end
-        box._dotCount = (box._dotCount + 1) % (maxDots + 1)
-        displayValue = string.rep(".", box._dotCount)
-        if displayValue == "" then displayValue = "." end
-        unit = nil
-    end
-
-    -- Set box.value so dashboard/dirty can track change for redraws
+    -- Cache and update box
     box._currentDisplayValue = displayValue
 
     box._cache = {
@@ -94,7 +67,8 @@ function render.wakeup(box)
         titlepaddingtop    = getParam(box, "titlepaddingtop"),
         titlepaddingbottom = getParam(box, "titlepaddingbottom"),
         displayValue       = displayValue,
-        unit               = unit,
+        novalue            = getParam(box, "novalue"),
+        unit               = getParam(box, "unit"),
         font               = getParam(box, "font"),
         valuealign         = getParam(box, "valuealign"),
         textcolor          = resolveThemeColor("textcolor", getParam(box, "textcolor")),
