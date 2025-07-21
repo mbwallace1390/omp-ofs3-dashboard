@@ -53,7 +53,7 @@ end
 
 
 function render.wakeup(box)
-    local value = ofs3.session.craftName
+    local value = model.name() -- ofs3.session.craftName
     local displayValue
 
     -- Fallback text if no craftname configured or set in RF
