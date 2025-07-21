@@ -47,6 +47,9 @@ function render.wakeup(box)
 
     local telemetry = ofs3.tasks.telemetry
     
+    if not telemetry then
+        return -- No telemetry available, cannot update
+    end
 
     local getSensor = telemetry.getSensor
     local pitch = getSensor("attpitch") or 0

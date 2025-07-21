@@ -115,8 +115,33 @@ local sensorTable = {
 
 
     -- RSSI Sensors
+    -- RSSI Sensors
     rssi = {
         name = i18n("telemetry.sensors.rssi"),
+        mandatory = true,
+        stats = true,
+        switch_alerts = true,
+        unit = UNIT_PERCENT,
+        unit_string = "%",
+        sensors = {
+            sim = {
+                { appId = 0xF010, subId = 0 },
+            },
+            sport = {
+                { appId = 0xF010, subId = 0 },
+            },
+            crsf = {
+                {crsfId=0x14, subId = 2}
+            },
+            crsfLegacy = {
+                {crsfId=0x14, subIdStart=0, subIdEnd=1}
+            },
+        },
+    },
+
+    -- RSSI Sensors
+    link = {
+        name = i18n("telemetry.sensors.link"),
         mandatory = true,
         stats = true,
         switch_alerts = true,
@@ -126,13 +151,21 @@ local sensorTable = {
             sim = {
                 { appId = 0xF101, subId = 0 },
             },
+            sport = {
+                { appId = 0xF101, subId = 0 },
+                "RSSI",   -- fallback for older versions
+            },
             crsf = {
-                "Rx RSSI 1",  
-                "Rx RSSI 2",
-                "Rx Quality",
+                { crsfId = 0x14, subIdStart = 0, subIdEnd = 1 },
+                "Rx RSSI1", -- fallback for older versions
+            },
+            crsfLegacy = {
+                { crsfId = 0x14, subIdStart = 0, subIdEnd = 1 },
+                "RSSI 1",   -- fallback for older versions
+                "RSSI 2",
             },
         },
-    },
+    }, 
 
     -- RSSI Sensors
     armed = {

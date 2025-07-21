@@ -1,5 +1,5 @@
 --[[
- * Copyright (C) ofs3 Project
+ * Copyright (C) Rotorflight Project
  * License GPLv3: https://www.gnu.org/licenses/gpl-3.0.en.html
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -81,7 +81,7 @@ function tasks.wakeup()
 
     if ofs3.session.telemetryTypeChanged then
         ofs3.utils.logRotorFlightBanner()
-        ofs3.utils.log("Telemetry type changed, resetting tasks.", "info")
+        --ofs3.utils.log("Telemetry type changed, resetting tasks.", "info")
         ofs3.session.telemetryTypeChanged = false
         tasks.resetAllTasks()
         tasksLoaded = false
@@ -137,9 +137,16 @@ function tasks.wakeup()
                 -- Signal the session connected immediately when high priority finishes
                 if level == "high" then
                     ofs3.utils.playFileCommon("beep.wav")
-                    ofs3.session.isConnected = true
                     ofs3.flightmode.current = "preflight"
                     ofs3.tasks.events.flightmode.reset()
+                    ofs3.session.isConnectedHigh = true
+                    return
+                elseif level == "medium" then
+                    ofs3.session.isConnectedMedium = true
+                    return
+                elseif level == "low" then 
+                    ofs3.session.isConnectedLow = true    
+                    ofs3.session.isConnected = true  
                     collectgarbage()
                     return
                 end
