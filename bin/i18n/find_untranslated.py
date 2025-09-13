@@ -2,7 +2,7 @@ import os
 import re
 import argparse
 
-LUA_SOURCE_DIR = "../../scripts/rfsuite/"
+LUA_SOURCE_DIR = "../../scripts/ofs3/"
 EXCLUDE_DIR = os.path.join(LUA_SOURCE_DIR, "i18n")
 ALLOWED_FIELDS = {"title", "value", "label", "text"}
 WHITELIST_VALUES = {
@@ -66,7 +66,7 @@ def scan_for_untranslated(lua_dir, path_filter=None):
 
     string_pattern = re.compile(r"(?<!\\)(['\"])(.*?)(?<!\\)\1")
     i18n_pattern = re.compile(r"i18n\.get\(\s*['\"](.*?)['\"]\s*\)")
-    debug_line_pattern = re.compile(r"(rfsuite\.utils\.log|log\s*\(|print\s*\()")
+    debug_line_pattern = re.compile(r"(ofs3\.utils\.log|log\s*\(|print\s*\()")
     type_check_pattern = re.compile(r"==\s*['\"](function|string|table|number)['\"]")
     constant_pattern = re.compile(r"^[A-Z0-9_]{3,}$")
     field_pattern = re.compile(r"(\b\w+)\s*=\s*['\"](.*?)['\"]")

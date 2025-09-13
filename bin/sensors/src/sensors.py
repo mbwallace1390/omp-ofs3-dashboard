@@ -8,11 +8,11 @@ import os
 
 SENSOR_FILE_EXT = ".lua"
 
-# Require config path from RFSUITE_CONFIG env var
-CONFIG_PATH = os.environ.get('RFSUITE_CONFIG')
+# Require config path from OFS3_CONFIG env var
+CONFIG_PATH = os.environ.get('OFS3_CONFIG')
 
 if not CONFIG_PATH:
-    print("[CONFIG ERROR] Environment variable RFSUITE_CONFIG is not set.")
+    print("[CONFIG ERROR] Environment variable OFS3_CONFIG is not set.")
     sys.exit(1)
 
 CONFIG_PATH = Path(CONFIG_PATH)

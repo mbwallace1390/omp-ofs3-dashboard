@@ -1049,7 +1049,7 @@ app._uiTasks = {
   -- 9. Saving Progress Display
   function()
     if app.triggers.isSaving then
-      app.dialogs.saveProgressCounter = app.dialogs.saveProgressCounter + 5
+      app.dialogs.saveProgressCounter = app.dialogs.saveProgressCounter + 10
       if app.pageState >= app.pageStatus.saving then
         if not app.dialogs.saveDisplay then
           app.triggers.saveFailed          = false
@@ -1157,7 +1157,7 @@ app._uiTasks = {
 -- Tasks are executed in order, wrapping around to the beginning of the list as needed.
 app._nextUiTask         = 1   -- accumulator for fractional tasks per tick
 app._taskAccumulator    = 0   -- desired throughput percentage of total tasks per tick (0-100)
-app._uiTaskPercent      = 50  -- e.g., 50% of tasks each tick
+app._uiTaskPercent      = 100  -- e.g., 100% of tasks each tick
 function app.wakeup()
 
 

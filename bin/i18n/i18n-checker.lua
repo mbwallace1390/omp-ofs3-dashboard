@@ -81,8 +81,8 @@ end
 -- Determine root directory from command-line or default
 local root_folder = arg[1]
 if not root_folder or root_folder == "" then
-    print("[INFO] No root folder provided. Using default: ../../scripts/rfsuite/i18n/")
-    root_folder = "../../scripts/rfsuite/i18n/"
+    print("[INFO] No root folder provided. Using default: ../../scripts/ofs3/i18n/")
+    root_folder = "../../scripts/ofs3/i18n/"
 end
 
 root_folder = normalize_path(root_folder)

@@ -268,7 +268,8 @@ local function init()
         name = ofs3.config.bgTaskName,
         key = ofs3.config.bgTaskKey,
         wakeup = ofs3.tasks.wakeup,
-        event = ofs3.tasks.event
+        event = ofs3.tasks.event,
+        init = ofs3.tasks.init
     })
 
     -- widgets are loaded dynamically

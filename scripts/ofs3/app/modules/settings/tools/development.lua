@@ -51,18 +51,6 @@ formFieldCount = formFieldCount + 1
                                                             end    
                                                         end)                                                        
 
-    formFieldCount = formFieldCount + 1
-    ofs3.session.formLineCnt = ofs3.session.formLineCnt + 1
-    ofs3.app.formLines[ofs3.session.formLineCnt] = form.addLine(i18n("app.modules.settings.txt_apiversion"))
-    ofs3.app.formFields[formFieldCount] = form.addChoiceField(ofs3.app.formLines[ofs3.session.formLineCnt], nil, 
-                                                        ofs3.utils.msp_version_array_to_indexed(),
-                                                        function() 
-                                                                return settings.apiversion
-                                                        end, 
-                                                        function(newValue) 
-                                                                settings.apiversion = newValue
-                                                        end) 
-
 
 
     local logpanel = form.addExpansionPanel(i18n("app.modules.settings.txt_logging"))
@@ -124,37 +112,6 @@ formFieldCount = formFieldCount + 1
                                                             end    
                                                         end) 
  
-    formFieldCount = formFieldCount + 1
-    ofs3.session.formLineCnt = ofs3.session.formLineCnt + 1
-    ofs3.app.formLines[ofs3.session.formLineCnt] = logpanel:addLine(i18n("app.modules.settings.txt_mspdata"))
-    ofs3.app.formFields[formFieldCount] = form.addBooleanField(ofs3.app.formLines[ofs3.session.formLineCnt], 
-                                                        nil, 
-                                                        function() 
-                                                            if ofs3.preferences and ofs3.preferences.developer then
-                                                                return settings['logmsp'] 
-                                                            end
-                                                        end, 
-                                                        function(newValue) 
-                                                            if ofs3.preferences and ofs3.preferences.developer then
-                                                                settings.logmsp = newValue
-                                                            end    
-                                                        end)     
-
-    formFieldCount = formFieldCount + 1
-    ofs3.session.formLineCnt = ofs3.session.formLineCnt + 1
-    ofs3.app.formLines[ofs3.session.formLineCnt] = logpanel:addLine(i18n("app.modules.settings.txt_queuesize"))
-    ofs3.app.formFields[formFieldCount] = form.addBooleanField(ofs3.app.formLines[ofs3.session.formLineCnt], 
-                                                        nil, 
-                                                        function() 
-                                                            if ofs3.preferences and ofs3.preferences.developer then
-                                                                return settings['logmspQueue'] 
-                                                            end
-                                                        end, 
-                                                        function(newValue) 
-                                                            if ofs3.preferences and ofs3.preferences.developer then
-                                                                settings.logmspQueue = newValue
-                                                            end    
-                                                        end)                                                             
 
     formFieldCount = formFieldCount + 1
     ofs3.session.formLineCnt = ofs3.session.formLineCnt + 1

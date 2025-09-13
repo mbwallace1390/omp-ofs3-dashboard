@@ -45,9 +45,9 @@ function ui.progressDisplay(title, message)
                                         local app = ofs3.app
                                         app.dialogs.progress:value(app.dialogs.progressCounter)
                                         if not app.triggers.closeProgressLoader then
-                                            app.dialogs.progressCounter = app.dialogs.progressCounter + 5
+                                            app.dialogs.progressCounter = app.dialogs.progressCounter + 10
                                         else
-                                            app.dialogs.progressCounter = app.dialogs.progressCounter + 15
+                                            app.dialogs.progressCounter = app.dialogs.progressCounter + 20
                                             if app.dialogs.progressCounter >= 100 then
                                                 app.dialogs.progress:close()
                                                 app.dialogs.progressDisplay = false
@@ -105,11 +105,11 @@ function ui.progressNolinkDisplay()
                                     msg, invalid = i18n("app.check_discovered_sensors"), true
                                     end
                                     app.triggers.invalidConnectionSetup = invalid
-                                    local step = invalid and 5 or 10
+                                    local step = invalid and 10 or 15
                                     app.dialogs.nolinkValueCounter = app.dialogs.nolinkValueCounter + step
                                     ofs3.app.dialogs.noLink:value(app.dialogs.nolinkValueCounter)
                                     ofs3.app.dialogs.noLink:message(msg)
-                                    if invalid and app.dialogs.nolinkValueCounter == 10 then app.audio.playBufferWarn = true end
+                                    if invalid and app.dialogs.nolinkValueCounter == 15 then app.audio.playBufferWarn = true end
                                     if app.dialogs.nolinkValueCounter >= 100 then
                                       app.dialogs.nolinkDisplay = false
                                       app.triggers.wasConnected    = true
