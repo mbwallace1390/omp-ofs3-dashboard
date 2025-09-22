@@ -51,12 +51,12 @@ local eventTable = {
             local suppressionPercent = userpref.general.gimbalsupression or 0.85
             local suppressionLimit = suppressionPercent * 1024
 
-            if math.abs(collective) > suppressionLimit or
-               math.abs(aileron) > suppressionLimit or
-               math.abs(elevator) > suppressionLimit or
-               math.abs(rudder) > suppressionLimit then
-                return
-            end
+            --if math.abs(collective) > suppressionLimit or
+            --   math.abs(aileron) > suppressionLimit or
+            --   math.abs(elevator) > suppressionLimit or
+            --   math.abs(rudder) > suppressionLimit then
+            --    return
+            --end
 
             if cellVoltage < warnVoltage then
                 ofs3.utils.playFile("events", "alerts/lowvoltage.wav")
