@@ -1,9 +1,9 @@
 
 
-local i18n = ofs3.i18n.get
+
 local S_PAGES = {
-    {name = i18n("app.modules.settings.dashboard_theme"), script = "dashboard_theme.lua", image = "dashboard_theme.png"},
-    {name = i18n("app.modules.settings.dashboard_settings"), script = "dashboard_settings.lua", image = "dashboard_settings.png"},
+    {name = "@i18n(app.modules.settings.dashboard_theme)@", script = "dashboard_theme.lua", image = "dashboard_theme.png"},
+    {name = "@i18n(app.modules.settings.dashboard_settings)@", script = "dashboard_settings.lua", image = "dashboard_settings.png"},
 }
 
 local function openPage(pidx, title, script)
@@ -41,7 +41,7 @@ local function openPage(pidx, title, script)
     local x = windowWidth - buttonW - 10
 
     ofs3.app.ui.fieldHeader(
-        i18n(i18n("app.modules.settings.name") .. " / " .. i18n("app.modules.settings.dashboard"))
+        "@i18n(app.modules.settings.name)@" .. " / " .. "@i18n(app.modules.settings.dashboard)@"
     )
 
 
@@ -136,7 +136,7 @@ local function event(widget, category, value, x, y)
     if category == EVT_CLOSE and value == 0 or value == 35 then
         ofs3.app.ui.openPage(
             pageIdx,
-            i18n("app.modules.settings.name"),
+            "@i18n(app.modules.settings.name)@",
             "settings/settings.lua"
         )
         return true
@@ -148,7 +148,7 @@ local function onNavMenu()
     ofs3.app.ui.progressDisplay()
         ofs3.app.ui.openPage(
             pageIdx,
-            i18n("app.modules.settings.name"),
+            "@i18n(app.modules.settings.name)@",
             "settings/settings.lua"
         )
         return true

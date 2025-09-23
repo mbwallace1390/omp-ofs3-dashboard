@@ -22,7 +22,7 @@ local ui = {}
 
 local arg = {...}
 local config = arg[1]
-local i18n = ofs3.i18n.get
+
 
 -- Displays a progress dialog with a title and message.
 -- @param title The title of the progress dialog (optional, default is "Loading").
@@ -30,8 +30,8 @@ local i18n = ofs3.i18n.get
 function ui.progressDisplay(title, message)
     if ofs3.app.dialogs.progressDisplay then return end
 
-    title = title or i18n("app.msg_loading")
-    message = message or i18n("app.msg_loading_from_fbl")
+    title = title or "@i18n(app.msg_loading)@"
+    message = message or "@i18n(app.msg_loading_from_fbl)@"
 
     ofs3.app.dialogs.progressDisplay = true
     ofs3.app.dialogs.progressWatchDog = os.clock()
@@ -80,8 +80,8 @@ function ui.progressNolinkDisplay()
 
     ofs3.app.dialogs.noLink = form.openProgressDialog(
                                 {
-                                title = i18n("app.msg_connecting"), 
-                                message = i18n("app.msg_connecting_to_fbl"),
+                                title = "@i18n(app.msg_connecting)@", 
+                                message = "@i18n(app.msg_connecting_to_fbl)@",
                                 close = function()
                                 end,
                                 wakeup = function()
@@ -94,15 +94,15 @@ function ui.progressNolinkDisplay()
                                     local sensorElrs  = system.getSource({crsfId=0x14, subIdStart=0, subIdEnd=1})
                                     local curRssi    = app.utils.getRSSI()
                                     local invalid, abort = false, false
-                                    local msg = i18n("app.msg_connecting_to_fbl")
+                                    local msg = "@i18n(app.msg_connecting_to_fbl)@"
                                     if not utils.ethosVersionAtLeast() then
-                                    msg = string.format("%s < V%d.%d.%d", string.upper(i18n("ethos")), table.unpack(ofs3.config.ethosVersion))
+                                    msg = string.format("%s < V%d.%d.%d", string.upper("@i18n(ethos)@"), table.unpack(ofs3.config.ethosVersion))
                                     elseif not ofs3.tasks.active() then
-                                    msg, invalid, abort = i18n("app.check_bg_task"), true, true
+                                    msg, invalid, abort = "@i18n(app.check_bg_task)@", true, true
                                     elseif not moduleEnabled and not app.offlineMode then
-                                    msg, invalid = i18n("app.check_rf_module_on"), true
+                                    msg, invalid = "@i18n(app.check_rf_module_on)@", true
                                     elseif not (sensorSport or sensorElrs) and not app.offlineMode then
-                                    msg, invalid = i18n("app.check_discovered_sensors"), true
+                                    msg, invalid = "@i18n(app.check_discovered_sensors)@", true
                                     end
                                     app.triggers.invalidConnectionSetup = invalid
                                     local step = invalid and 10 or 15
@@ -143,9 +143,9 @@ end
 function ui.progressDisplaySave(message)
     ofs3.app.dialogs.saveDisplay = true
     ofs3.app.dialogs.saveWatchDog = os.clock()
-    local title = i18n("app.msg_saving")
+    local title = "@i18n(app.msg_saving)@"
     if not message then
-        message = i18n("app.msg_saving_to_fbl")
+        message = "@i18n(app.msg_saving_to_fbl)@"
     end   
 
     ofs3.app.dialogs.save = form.openProgressDialog(
@@ -1107,13 +1107,13 @@ function ui.openPageDashboard(idx, title, script, source, folder)
 
     form.clear()
 
-    --form.addLine("../ " .. i18n("app.modules.settings.dashboard") .. " / " .. i18n("app.modules.settings.name") .. " / " .. title)
-    form.addLine( i18n("app.modules.settings.name") .. " / " .. title)
+    --form.addLine("../ " .. "@i18n(app.modules.settings.dashboard)@" .. " / " .. "@i18n(app.modules.settings.name)@" .. " / " .. title)
+    form.addLine( "@i18n(app.modules.settings.name)@" .. " / " .. title)
     buttonW = 100
     local x = windowWidth - (buttonW * 2) - 15
 
     ofs3.app.formNavigationFields['menu'] = form.addButton(line, {x = x, y = ofs3.app.radio.linePaddingTop, w = buttonW, h = ofs3.app.radio.navbuttonHeight}, {
-        text = i18n("app.navigation_menu"),
+        text = "@i18n(app.navigation_menu)@",
         icon = nil,
         options = FONT_S,
         paint = function()
@@ -1127,7 +1127,7 @@ function ui.openPageDashboard(idx, title, script, source, folder)
 
             ofs3.app.ui.openPage(
                 pageIdx,
-                i18n("app.modules.settings.dashboard"),
+                "@i18n(app.modules.settings.dashboard)@",
                 "settings/tools/dashboard_settings.lua"
             )
         end
@@ -1146,9 +1146,9 @@ function ui.openPageDashboard(idx, title, script, source, folder)
 
                 local buttons = {
                     {
-                        label  = i18n("app.btn_ok_long"),
+                        label  = "@i18n(app.btn_ok_long)@",
                         action = function()
-                            local msg = i18n("app.modules.profile_select.save_prompt_local")
+                            local msg = "@i18n(app.modules.profile_select.save_prompt_local)@"
                             ofs3.app.ui.progressDisplaySave(msg:gsub("%?$", "."))
                             if ofs3.app.Page.write then
                                 ofs3.app.Page.write()
@@ -1160,7 +1160,7 @@ function ui.openPageDashboard(idx, title, script, source, folder)
                         end,
                     },
                     {
-                        label  = i18n("app.modules.profile_select.cancel"),
+                        label  = "@i18n(app.modules.profile_select.cancel)@",
                         action = function()
                             return true
                         end,
@@ -1169,8 +1169,8 @@ function ui.openPageDashboard(idx, title, script, source, folder)
 
                 form.openDialog({
                     width   = nil,
-                    title   = i18n("app.modules.profile_select.save_settings"),
-                    message = i18n("app.modules.profile_select.save_prompt_local"),
+                    title   = "@i18n(app.modules.profile_select.save_settings)@",
+                    message = "@i18n(app.modules.profile_select.save_prompt_local)@",
                     buttons = buttons,
                     wakeup  = function() end,
                     paint   = function() end,
@@ -1254,7 +1254,7 @@ function ui.navigationButtons(x, y, w, h)
     if navButtons.menu ~= nil and navButtons.menu == true then
 
         ofs3.app.formNavigationFields['menu'] = form.addButton(line, {x = menuOffset, y = y, w = w, h = h}, {
-            text = i18n("app.navigation_menu"),
+            text = "@i18n(app.navigation_menu)@",
             icon = nil,
             options = FONT_S,
             paint = function()
@@ -1274,7 +1274,7 @@ function ui.navigationButtons(x, y, w, h)
     if navButtons.save ~= nil and navButtons.save == true then
 
         ofs3.app.formNavigationFields['save'] = form.addButton(line, {x = saveOffset, y = y, w = w, h = h}, {
-            text = i18n("app.navigation_save"),
+            text = "@i18n(app.navigation_save)@",
             icon = nil,
             options = FONT_S,
             paint = function()
@@ -1293,7 +1293,7 @@ function ui.navigationButtons(x, y, w, h)
     if navButtons.reload ~= nil and navButtons.reload == true then
 
         ofs3.app.formNavigationFields['reload'] = form.addButton(line, {x = reloadOffset, y = y, w = w, h = h}, {
-            text = i18n("app.navigation_reload"),
+            text = "@i18n(app.navigation_reload)@",
             icon = nil,
             options = FONT_S,
             paint = function()
@@ -1313,7 +1313,7 @@ function ui.navigationButtons(x, y, w, h)
     -- TOOL BUTTON
     if navButtons.tool ~= nil and navButtons.tool == true then
         ofs3.app.formNavigationFields['tool'] = form.addButton(line, {x = toolOffset, y = y, w = wS, h = h}, {
-            text = i18n("app.navigation_tools"),
+            text = "@i18n(app.navigation_tools)@",
             icon = nil,
             options = FONT_S,
             paint = function()
@@ -1334,7 +1334,7 @@ function ui.navigationButtons(x, y, w, h)
 
             -- Execution of the file succeeded
             ofs3.app.formNavigationFields['help'] = form.addButton(line, {x = helpOffset, y = y, w = wS, h = h}, {
-                text = i18n("app.navigation_help"),
+                text = "@i18n(app.navigation_help)@",
                 icon = nil,
                 options = FONT_S,
                 paint = function()
@@ -1356,7 +1356,7 @@ function ui.navigationButtons(x, y, w, h)
         else
             -- No help available
             ofs3.app.formNavigationFields['help'] = form.addButton(line, {x = helpOffset, y = y, w = wS, h = h}, {
-                text = i18n("app.navigation_help"),
+                text = "@i18n(app.navigation_help)@",
                 icon = nil, options = FONT_S, paint = function() end, press = function() end
             })
             ofs3.app.formNavigationFields['help']:enable(false)
@@ -1381,7 +1381,7 @@ function ui.openPageHelp(txtData, section)
         title = "Help - " .. ofs3.app.lastTitle,
         message = message,
         buttons = {{
-            label = i18n("app.btn_close"),
+            label = "@i18n(app.btn_close)@",
             action = function() return true end
         }},
         options = TEXT_LEFT

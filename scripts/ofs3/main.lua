@@ -120,9 +120,6 @@ ofs3.config.bgTaskKey = "ofs3bg"                                          -- key
 -- ofs3.app: Application module loaded from "app/app.lua" with the provided configuration.
 ofs3.compiler = assert(loadfile("lib/compile.lua"))(ofs3.config) 
 
--- Load the i18n system
-ofs3.i18n  = assert(ofs3.compiler.loadfile("lib/i18n.lua"))(ofs3.config)
-ofs3.i18n.load()     
 
 -- library with utility functions used throughou the suite
 ofs3.utils = assert(ofs3.compiler.loadfile("lib/utils.lua"))(ofs3.config)

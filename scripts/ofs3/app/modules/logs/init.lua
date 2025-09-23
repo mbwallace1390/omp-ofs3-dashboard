@@ -18,7 +18,7 @@
 
 ]] --
 local init = {
-    title = ofs3.i18n.get("app.modules.logs.name"), -- title of the page
+    title = "@i18n(app.modules.logs.name)@", -- title of the page
     section = "tools", -- do not run if busy with msp
     script = "logs_logs.lua", -- run this script
     image = "gfx/logs.png", -- image for the page

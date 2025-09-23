@@ -19,7 +19,7 @@
 
 ]] --
 local app = {}
-local i18n = ofs3.i18n.get
+
 local utils = ofs3.utils
 local log = utils.log
 local compile = ofs3.compiler.loadfile
@@ -567,13 +567,13 @@ function app.mspApiUpdateFormAttributes(values, structure)
                         if v.field == apikey and mspapiID == f.mspapi then
 
                             -- insert help string
-                            local help_target = "api." .. mspapiNAME .. "." .. apikey
-                            local help_return = i18n(help_target)
-                            if help_target ~=  help_return then
-                                v.help = help_return
-                            else
-                                v.help = nil    
-                            end
+                            --local help_target = "api." .. mspapiNAME .. "." .. apikey
+                            --local help_return = i18n(help_target)
+                            --if help_target ~=  help_return then
+                            --    v.help = help_return
+                            --else
+                            --    v.help = nil    
+                            --end
 
                             ofs3.app.ui.injectApiAttributes(formField, f, v)
 
@@ -598,13 +598,13 @@ function app.mspApiUpdateFormAttributes(values, structure)
                                     -- we have now found a bitmap field so should proceed with injecting
                                     -- the values into the form field
                                     -- insert help string
-                                    local help_target = "api." .. mspapiNAME .. "." .. apikey
-                                    local help_return = i18n(help_target)
-                                    if help_target ~=  help_return then
-                                        v.help = help_return
-                                    else
-                                        v.help = nil    
-                                    end
+                                    --local help_target = "api." .. mspapiNAME .. "." .. apikey
+                                    --local help_return = i18n(help_target)
+                                    --if help_target ~=  help_return then
+                                    --    v.help = help_return
+                                    --else
+                                    --    v.help = nil    
+                                    --end
 
                                     ofs3.app.ui.injectApiAttributes(formField, f, b)
 
@@ -963,7 +963,7 @@ app._uiTasks = {
     if (os.clock() - app.dialogs.saveWatchDog) > timeout
        or (app.dialogs.saveProgressCounter > 120 ) then
       app.audio.playTimeout = true
-      app.ui.progressDisplaySaveMessage(i18n("app.error_timed_out"))
+      app.ui.progressDisplaySaveMessage("@i18n(app.error_timed_out)@")
       app.ui.progressDisplaySaveCloseAllowed(true)
       app.dialogs.save:value(100)
       app.dialogs.saveProgressCounter = 0
@@ -981,7 +981,7 @@ app._uiTasks = {
     app.ui.progressDisplayValue(app.dialogs.progressCounter)
     if (os.clock() - app.dialogs.progressWatchDog) > 5 then
       app.audio.playTimeout = true
-      app.ui.progressDisplayMessage(i18n("app.error_timed_out"))
+      app.ui.progressDisplayMessage("@i18n(app.error_timed_out)@")
       app.ui.progressDisplayCloseAllowed(true)
       app.Page = app.PageTmp
       app.PageTmp = nil
@@ -996,17 +996,17 @@ app._uiTasks = {
       app.triggers.triggerSave = false
       form.openDialog({
         width   = nil,
-        title   = i18n("app.msg_save_settings"),
+        title   = "@i18n(app.msg_save_settings)@",
         message = (app.Page.extraMsgOnSave and
-                   i18n("app.msg_save_current_page").."\n\n"..app.Page.extraMsgOnSave or
-                   i18n("app.msg_save_current_page")),
-        buttons = {{ label=i18n("app.btn_ok"), action=function()
+                   "@i18n(app.msg_save_current_page)@".."\n\n"..app.Page.extraMsgOnSave or
+                   "@i18n(app.msg_save_current_page)@"),
+        buttons = {{ label="@i18n(app.btn_ok)@", action=function()
           app.PageTmp = app.Page
 
           app.triggers.isSaving = true
           saveSettings()
           return true
-        end },{ label=i18n("app.btn_cancel"),action=function() return true end }},
+        end },{ label="@i18n(app.btn_cancel)@",action=function() return true end }},
         wakeup = function() end,
         paint  = function() end,
         options= TEXT_LEFT
@@ -1028,19 +1028,19 @@ app._uiTasks = {
     if app.triggers.triggerReload then
       app.triggers.triggerReload = false
       form.openDialog({
-        title   = i18n("reload"):gsub("^%l", string.upper),
-        message = i18n("app.msg_reload_settings"),
-        buttons = {{ label=i18n("app.btn_ok"), action=function() app.triggers.reload = true; return true end },
-                   { label=i18n("app.btn_cancel"), action=function() return true end }},
+        title   = "@i18n(reload)@",
+        message = "@i18n(app.msg_reload_settings)@",
+        buttons = {{ label="@i18n(app.btn_ok)@", action=function() app.triggers.reload = true; return true end },
+                   { label="@i18n(app.btn_cancel)@", action=function() return true end }},
         options = TEXT_LEFT
       })
     elseif app.triggers.triggerReloadFull then
       app.triggers.triggerReloadFull = false
       form.openDialog({
-        title   = i18n("reload"):gsub("^%l", string.upper),
-        message = i18n("app.msg_reload_settings"),
-        buttons = {{ label=i18n("app.btn_ok"), action=function() app.triggers.reloadFull = true; return true end },
-                   { label=i18n("app.btn_cancel"), action=function() return true end }},
+        title   = "@i18n(reload)@",
+        message = "@i18n(app.msg_reload_settings)@",
+        buttons = {{ label="@i18n(app.btn_ok)@", action=function() app.triggers.reloadFull = true; return true end },
+                   { label="@i18n(app.btn_cancel)@", action=function() return true end }},
         options = TEXT_LEFT
       })
     end
@@ -1057,10 +1057,8 @@ app._uiTasks = {
           app.ui.progressDisplaySave()
           ofs3.tasks.msp.mspQueue.retryCount = 0
         end
-        local msg = ({[app.pageStatus.saving] = "app.msg_saving_settings",
-                     [app.pageStatus.eepromWrite] = "app.msg_saving_settings",
-                     [app.pageStatus.rebooting]   = "app.msg_rebooting"})[app.pageState]
-        app.ui.progressDisplaySaveValue(app.dialogs.saveProgressCounter, i18n(msg))
+
+        app.ui.progressDisplaySaveValue(app.dialogs.saveProgressCounter, "@i18n(app.pageStatus.saving)")
       else
         app.triggers.isSaving      = false
         app.dialogs.saveDisplay    = false
@@ -1072,22 +1070,6 @@ app._uiTasks = {
     end
   end,
 
-  -- 10. Armed-Save Warning
-  function()
-    if not app.triggers.showSaveArmedWarning or app.triggers.closeSave then return end
-    if not app.dialogs.progressDisplay then
-      app.dialogs.progressCounter = 0
-      local key = (ofs3.session.apiVersion >= 12.08 and "app.msg_please_disarm_to_save_warning" or "app.msg_please_disarm_to_save")
-      app.ui.progressDisplay(
-        i18n("app.msg_save_not_commited"),
-        i18n(key)
-      )
-    end
-    if app.dialogs.progressCounter >= 100 then
-      app.triggers.showSaveArmedWarning = false
-      app.ui.progressDisplayClose()
-    end
-  end,
 
   -- 11. Telemetry & Page State Updates
   function()

@@ -3,7 +3,7 @@ local utils = assert(ofs3.compiler.loadfile("SCRIPTS:/" .. ofs3.config.baseDir .
 local res = system.getVersion()
 local LCD_W = res.lcdWidth
 local LCD_H = res.lcdHeight
-local i18n = ofs3.i18n.get
+
 local graphPos = {}
 graphPos['menu_offset'] = ofs3.app.radio.logGraphMenuOffset
 graphPos['height_offset'] = ofs3.app.radio.logGraphHeightOffset or 0

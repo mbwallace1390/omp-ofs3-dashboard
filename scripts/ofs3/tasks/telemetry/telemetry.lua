@@ -18,7 +18,7 @@
 ]] --
 local arg = {...}
 local config = arg[1]
-local i18n = ofs3.i18n.get
+
 local telemetry = {}
 local protocol, telemetrySOURCE, crsfSOURCE
 
@@ -117,7 +117,7 @@ local sensorTable = {
     -- RSSI Sensors
     -- RSSI Sensors
     rssi = {
-        name = i18n("telemetry.sensors.rssi"),
+        name = "@i18n(telemetry.sensors.rssi)@",
         mandatory = true,
         stats = true,
         switch_alerts = true,
@@ -141,7 +141,7 @@ local sensorTable = {
 
     -- RSSI Sensors
     link = {
-        name = i18n("telemetry.sensors.link"),
+        name = "@i18n(telemetry.sensors.link)@",
         mandatory = true,
         stats = true,
         switch_alerts = true,
@@ -169,7 +169,7 @@ local sensorTable = {
 
     -- RSSI Sensors
     armed = {
-        name = i18n("telemetry.sensors.arming_flags"),
+        name = "@i18n(telemetry.sensors.arming_flags)@",
         mandatory = true,
         stats = false,
         switch_alerts = false,
@@ -189,7 +189,7 @@ local sensorTable = {
 
     -- RSSI Sensors
     profile = {
-        name = i18n("telemetry.sensors.profile"),
+        name = "@i18n(telemetry.sensors.profile)@",
         mandatory = true,
         stats = false,
         switch_alerts = false,
@@ -210,7 +210,7 @@ local sensorTable = {
 
     -- Voltage Sensors
     voltage = {
-        name = i18n("telemetry.sensors.voltage"),
+        name = "@i18n(telemetry.sensors.voltage)@",
         mandatory = true,
         stats = true,
         set_telemetry_sensors = 3,
@@ -229,7 +229,7 @@ local sensorTable = {
 
     -- RPM Sensors
     rpm = {
-        name = i18n("telemetry.sensors.headspeed"),
+        name = "@i18n(telemetry.sensors.headspeed)@",
         mandatory = true,
         stats = true,
         set_telemetry_sensors = 60,
@@ -248,7 +248,7 @@ local sensorTable = {
 
     -- Fuel and Capacity Sensors
     smartfuel = {
-        name = i18n("telemetry.sensors.smartfuel"),
+        name = "@i18n(telemetry.sensors.smartfuel)@",
         mandatory = false,
         stats = true,
         set_telemetry_sensors = nil,
@@ -267,7 +267,7 @@ local sensorTable = {
 
     -- Current Sensors
     current = {
-        name = i18n("telemetry.sensors.current"),
+        name = "@i18n(telemetry.sensors.current)@",
         mandatory = false,
         stats = true,
         set_telemetry_sensors = 18,
@@ -286,7 +286,7 @@ local sensorTable = {
 
     -- ESC Temperature Sensors
     temp_esc = {
-        name = i18n("telemetry.sensors.esc_temp"),
+        name = "@i18n(telemetry.sensors.esc_temp)@",
         mandatory = false,
         stats = true,
         set_telemetry_sensors = 23,
@@ -320,7 +320,7 @@ local sensorTable = {
 
     -- MCU Temperature Sensors
     temp_mcu = {
-        name = i18n("telemetry.sensors.mcu_temp"),
+        name = "@i18n(telemetry.sensors.mcu_temp)@",
         mandatory = false,
         stats = true,
         set_telemetry_sensors = 52,
@@ -354,7 +354,7 @@ local sensorTable = {
 
     -- Fuel and Capacity Sensors
     fuel = {
-        name = i18n("telemetry.sensors.fuel"),
+        name = "@i18n(telemetry.sensors.fuel)@",
         mandatory = false,
         stats = true,
         set_telemetry_sensors = 6,
@@ -374,7 +374,7 @@ local sensorTable = {
     },
 
     consumption = {
-        name = i18n("telemetry.sensors.consumption"),
+        name = "@i18n(telemetry.sensors.consumption)@",
         mandatory = true,
         stats = true,
         set_telemetry_sensors = 5,
