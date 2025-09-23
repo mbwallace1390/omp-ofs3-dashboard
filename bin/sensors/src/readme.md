@@ -42,8 +42,8 @@ Before running the app or building, set the following environment variables:
 
 **Example:**
 ```bat
-set FRSKY_ofs3_GIT_SRC=C:\GitHub\rotorflight-lua-ethos-suite
-set FRSKY_SIM_SRC=C:\GitHub\rotorflight-lua-ethos-suite\output
+set FRSKY_ofs3_GIT_SRC=C:\GitHub\omp-ofs3-dashboard
+set FRSKY_SIM_SRC=C:\GitHub\omp-ofs3-dashboard\output
 ```
 
 ---

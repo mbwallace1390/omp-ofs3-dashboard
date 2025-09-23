@@ -1,5 +1,5 @@
 {
-  "git_src": "C:\\GitHub\\rotorflight-lua-ethos-suite",
+  "git_src": "C:\\GitHub\\omp-ofs3-dashboard",
   "tgt_name": "ofs3",
   "ethos_bin": "c:\\Program Files (x86)\\FrSky\\Ethos\\suite",
   "deploy_targets": [

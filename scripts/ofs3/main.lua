@@ -114,7 +114,7 @@ ofs3.config.bgTaskName = ofs3.config.toolName .. " [Background]"              --
 ofs3.config.bgTaskKey = "ofs3bg"                                          -- key id used for msp services
 
 -- main
--- ofs3: Main table for the rotorflight-lua-ethos-suite script.
+-- ofs3: Main table for the omp-ofs3-dashboard script.
 -- ofs3.config: Configuration table for the suite.
 -- ofs3.session: Session table for the suite.
 -- ofs3.app: Application module loaded from "app/app.lua" with the provided configuration.
@@ -176,7 +176,7 @@ end
 
 
 --[[
-    Initializes the main script for the rotorflight-lua-ethos-suite.
+    Initializes the main script for the omp-ofs3-dashboard.
 
     This function performs the following tasks:
     1. Checks if the Ethos version is supported using `ofs3.utils.ethosVersionAtLeast()`.
