@@ -2,7 +2,7 @@
 
     <Group name="Flight Control">
         <Sensor name="armed" label="Arm" type="bool" default="0"  multiplier="1" unit="" />
-        <Sensor name="rpm" label="Headspeed" round="true" type="range" default="1800" min="0" max="2000" rand="10" multiplier="1" unit="rpm" />
+        <Sensor name="rpm" label="Headspeed" round="true" type="range" default="1800" min="0" max="6000" rand="10" multiplier="1" unit="rpm" />
     </Group>
 
     <Group name="Power System">

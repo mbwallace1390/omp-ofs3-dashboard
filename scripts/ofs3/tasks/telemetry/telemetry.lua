@@ -178,7 +178,7 @@ local sensorTable = {
         sensors = {
             sim = {
                 { uid = 0x5FE0, unit = UNIT_RAW, dec = 0,
-                  value = function() return ofs3.utils.simSensors('armed') end,
+                  value = function() return not ofs3.utils.simSensors('armed') end,
                   min = 0, max = 1 },
             },
             crsf = {
@@ -197,9 +197,9 @@ local sensorTable = {
         unit_string = "",
         sensors = {
             sim = {
-                { uid = 0x5FE1, unit = UNIT_VOLT, dec = 0,
-                  value = function() return ofs3.utils.simSensors('armed') end,
-                  min = 0, max = 1600 },
+                { uid = 0x5FE1, unit = UNIT_RAW, dec = 0,
+                  value = function() return ofs3.utils.simSensors('profile') end,
+                  min = 0, max = 3 },
             },
             crsf = {
                 { appId = 0x5FE1, subId = 0 },
