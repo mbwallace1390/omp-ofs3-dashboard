@@ -104,8 +104,6 @@ app.triggers = triggers
 
 ]]
 app.ui = nil
-app.ui = assert(compile("app/lib/ui.lua"))(config)
-
 
 --[[
     Initializes the app.utils table and loads utility functions from the specified file.
@@ -1202,6 +1200,8 @@ end
     6. Opens the main menu UI.
 ]]
 function app.create()
+
+    app.ui = assert(compile("app/lib/ui.lua"))(config)
 
     -- ofs3.session.apiVersion = nil
     config.environment = system.getVersion()
