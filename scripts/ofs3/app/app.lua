@@ -576,35 +576,6 @@ function app.wakeup()
 
 end
 
-
---[[
-    Creates the log tool for the application.
-    This function initializes various configurations and settings for the log tool,
-    including disabling buffer warnings, setting the environment version, 
-    determining the LCD dimensions, loading the radio configuration, 
-    and setting the initial UI state. It also checks for developer mode, 
-    updates the menu selection, displays the progress, and opens the logs page in offline mode.
-]]
-function app.create_logtool()
-    triggers.showUnderUsedBufferWarning = false
-    triggers.showOverUsedBufferWarning = false
-
-    -- ofs3.session.apiVersion = nil
-    config.environment = system.getVersion()
-    config.ethosRunningVersion = {config.environment.major, config.environment.minor, config.environment.revision}
-
-    ofs3.session.lcdWidth, ofs3.session.lcdHeight = utils.getWindowSize()
-    app.radio = assert(compile("app/radios.lua"))()
-
-    app.uiState = app.uiStatus.init
-
-    ofs3.preferences.menulastselected["mainmenu"] = pidx
-    ofs3.app.ui.progressDisplay()
-
-    ofs3.app.offlineMode = true
-    ofs3.app.ui.openPage(1, "Logs", "logs/logs.lua", 1) -- final param says to load in standalone mode
-end
-
 --[[
     Function: app.create
 
@@ -759,10 +730,11 @@ function app.close()
         app.Page.close()
     end
 
+    if app.ui then
     if app.dialogs.progress then app.ui.progressDisplayClose() end
     if app.dialogs.save then app.ui.progressDisplaySaveClose() end
     if app.dialogs.noLink then app.ui.progressNolinkDisplayClose() end
-
+    end
 
     -- Reset configuration and compiler flags
     config.useCompiler = true
