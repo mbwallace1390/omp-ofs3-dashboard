@@ -8,13 +8,13 @@
       "program": "${workspaceFolder}/.vscode/scripts/deploy.py",
       "args": [
         "--config-env", "OFS3_CONFIG",
-        "--launch"
+        "--launch",
+        "--lang", "en",
       ],
       "console": "integratedTerminal",
       "subProcess": false, // prevents auto-attach to child procs
       "justMyCode": true,
-      "stopOnEntry": false,
-      "preLaunchTask": "kill deploy"
+      "stopOnEntry": false,     
     },
     {
       "name": "Deploy & Launch [Fast]",
@@ -24,14 +24,14 @@
       "args": [
         "--config-env", "OFS3_CONFIG",
         "--fileext", "fast",
-        "--launch"
+        "--launch",
+        "--lang", "en",
       ],
       "console": "integratedTerminal",
       "subProcess": false,
       "justMyCode": true,
       "stopOnEntry": false,
-      "preLaunchTask": "kill deploy"
-    },
+    },   
     {
       "name": "Deploy & Choose",
       "type": "debugpy",
@@ -40,13 +40,13 @@
       "args": [
         "--config-env", "OFS3_CONFIG",
         "--choose",
-        "--launch"
+        "--launch",
+        "--lang", "en",
       ],
       "console": "integratedTerminal",
       "subProcess": false,
       "justMyCode": true,
       "stopOnEntry": false,
-      "preLaunchTask": "kill deploy"
     },
     {
       "name": "Deploy & Choose [Fast]",
@@ -57,14 +57,45 @@
         "--config-env", "OFS3_CONFIG",
         "--fileext", "fast",
         "--choose",
-        "--launch"
+        "--launch",
+        "--lang", "en",
       ],
       "console": "integratedTerminal",
       "subProcess": false,
       "justMyCode": true,
       "stopOnEntry": false,
-      "preLaunchTask": "kill deploy"
     },
+    {
+      "name": "Deploy & Launch [choose lang]",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/.vscode/scripts/deploy.py",
+      "args": [
+        "--config-env", "OFS3_CONFIG",
+        "--launch",
+        "--lang", "${input:i18nLocale}",
+      ],
+      "console": "integratedTerminal",
+      "subProcess": false, // prevents auto-attach to child procs
+      "justMyCode": true,
+      "stopOnEntry": false,
+    },
+    {
+      "name": "Deploy & Choose [choose lang]",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/.vscode/scripts/deploy.py",
+      "args": [
+        "--config-env", "OFS3_CONFIG",
+        "--choose",
+        "--launch",
+        "--lang", "${input:i18nLocale}",
+      ],
+      "console": "integratedTerminal",
+      "subProcess": false,
+      "justMyCode": true,
+      "stopOnEntry": false,
+    },         
     {
       "name": "Deploy Radio",
       "type": "debugpy",
@@ -72,13 +103,13 @@
       "program": "${workspaceFolder}/.vscode/scripts/deploy.py",
       "args": [
         "--config-env", "OFS3_CONFIG",
-        "--radio"
+        "--radio",
+        "--lang", "en",
       ],
       "console": "integratedTerminal",
       "subProcess": false,
       "justMyCode": true,
       "stopOnEntry": false,
-      "preLaunchTask": "kill deploy"
     },
     {
       "name": "Deploy Radio [Fast]",
@@ -88,13 +119,13 @@
       "args": [
         "--config-env", "OFS3_CONFIG",
         "--fileext", "fast",
-        "--radio"
+        "--radio",
+        "--lang", "en",
       ],
       "console": "integratedTerminal",
       "subProcess": false,
       "justMyCode": true,
       "stopOnEntry": false,
-      "preLaunchTask": "kill deploy"
     },
     {
       "name": "Deploy Radio + Serial Debug",
@@ -104,13 +135,13 @@
       "args": [
         "--config-env", "OFS3_CONFIG",
         "--radio",
-        "--radio-debug"
+        "--radio-debug",
+        "--lang", "en",
       ],
       "console": "integratedTerminal",
       "subProcess": false,
       "justMyCode": true,
       "stopOnEntry": false,
-      "preLaunchTask": "kill deploy"
     },
     {
       "name": "Deploy Radio + Serial Debug [Fast]",
@@ -121,13 +152,13 @@
         "--config-env", "OFS3_CONFIG",
         "--fileext", "fast",
         "--radio",
-        "--radio-debug"
+        "--radio-debug",
+        "--lang", "en",
       ],
       "console": "integratedTerminal",
       "subProcess": false,
       "justMyCode": true,
       "stopOnEntry": false,
-      "preLaunchTask": "kill deploy"
     },
     {
       "name": "Radio: Serial Debug",
@@ -137,9 +168,36 @@
       "args": [
         "--config-env", "OFS3_CONFIG",
         "--radio",
-        "--connect-only"
+        "--connect-only",
+        "--lang", "en",
       ],
       "console": "integratedTerminal"
+    },
+    {
+      "name": "Clear locks",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/.vscode/scripts/deploy.py",
+      "args": ["--config-env", "OFS3_CONFIG", "--clear-lock"],
+      "console": "integratedTerminal",
+      "justMyCode": true,
+      "noDebug": true
+    } 
+  ],
+  "inputs": [
+    {
+      "id": "i18nLocale",
+      "type": "pickString",
+      "description": "Choose language",
+      "options": [
+        "en",
+        "de",
+        "fr",
+        "es",
+        "it",
+        "nl",
+      ],
+      "default": "en"
     }
   ]
 }

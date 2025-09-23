@@ -1,4 +1,9 @@
 {
+  "iscompiledcheck": {
+    "english": "true",
+    "translation": "true",
+    "needs_translation": true
+  },
   "reload": {
     "english": "reload",
     "translation": "recargar",

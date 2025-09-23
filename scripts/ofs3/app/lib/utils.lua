@@ -19,7 +19,7 @@
 
 ]] --
 local utils = {}
-local i18n = ofs3.i18n.get
+
 
 local arg = {...}
 local config = arg[1]

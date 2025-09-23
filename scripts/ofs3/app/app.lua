@@ -19,7 +19,7 @@
 
 ]] --
 local app = {}
-local i18n = ofs3.i18n.get
+
 local utils = ofs3.utils
 local log = utils.log
 local compile = ofs3.compiler.loadfile
@@ -104,8 +104,6 @@ app.triggers = triggers
 
 ]]
 app.ui = nil
-app.ui = assert(compile("app/lib/ui.lua"))(config)
-
 
 --[[
     Initializes the app.utils table and loads utility functions from the specified file.
@@ -289,585 +287,6 @@ local function invalidatePages()
     collectgarbage()
 end
 
--- Reboots the flight controller (FBL unit) by issuing an MSP command.
--- Sets the application page state to 'rebooting' and adds a reboot command to the MSP queue.
--- Once the command is processed, it invalidates the pages.
-local function rebootFc()
-
-    app.pageState = app.pageStatus.rebooting
-    ofs3.tasks.msp.mspQueue:add({
-        command = 68, -- MSP_REBOOT
-        processReply = function(self, buf)
-            invalidatePages()
-            utils.onReboot()
-        end,
-        simulatorResponse = {}
-    })
-end
-
--- This table represents an MSP (MultiWii Serial Protocol) command to write data to EEPROM.
--- @field command The MSP command code for EEPROM write (250).
--- @field processReply Function to handle the response from the EEPROM write command.
--- @field errorHandler Function to handle errors that occur during the EEPROM write command.
--- @field simulatorResponse Table to handle simulator responses (currently empty).
-local mspEepromWrite = {
-    command = 250, -- MSP_EEPROM_WRITE, fails when armed
-    processReply = function(self, buf)
-        app.triggers.closeSave = true
-        if app.Page.postEepromWrite then 
-            app.Page.postEepromWrite() 
-        end
-        
-        if app.Page.reboot then
-            -- app.audio.playSaveArmed = true
-            rebootFc()
-
-        else
-            invalidatePages()
-        end
-    end,
-    errorHandler = function(self)
-        app.triggers.closeSave = true
-        app.audio.playSaveArmed = true
-        app.triggers.showSaveArmedWarning = true
-    end,
-    simulatorResponse = {}
-}
-
---[[
-    Function: app.settingsSaved
-
-    Description:
-    This function handles the saving of settings. It checks if the current page requires writing to EEPROM.
-    If so, it queues an EEPROM write task unless one is already in progress. If no EEPROM write is needed,
-    it invalidates the pages and sets a trigger to close the save process. Finally, it runs garbage collection.
-
-    Parameters:
-    None
-
-    Returns:
-    None
-]]
-function app.settingsSaved()
-
-    -- check if this page requires writing to eeprom to save (most do)
-    if app.Page and app.Page.eepromWrite then
-        -- don't write again if we're already responding to earlier page.write()s
-        if app.pageState ~= app.pageStatus.eepromWrite then
-            app.pageState = app.pageStatus.eepromWrite
-            ofs3.tasks.msp.mspQueue:add(mspEepromWrite)
-        end
-    elseif app.pageState ~= app.pageStatus.eepromWrite then
-        -- If we're not already trying to write to eeprom from a previous save, then we're done.
-        invalidatePages()
-        app.triggers.closeSave = true
-    end
-    collectgarbage()
-    utils.reportMemoryUsage("app.settingsSaved")
-end
-
---[[
-    Function: saveSettings
-    Description: This function saves all settings by making API calls to save data. It handles the saving process differently for multi mspapi.
-    It logs the saving process, initializes APIs, sets error and completion handlers, injects values into the payload, and sends the payload.
-    If preSave and postSave functions are defined, they are executed before and after the saving process respectively.
-    The function also ensures that all API requests are completed before finalizing the save process.
---]]
-local function saveSettings()
-    if app.pageState == app.pageStatus.saving then return end
-
-    app.pageState = app.pageStatus.saving
-    app.saveTS = os.clock()
-
-    -- we handle saving 100% different for multi mspapi
-    log("Saving data", "debug")
-
-    local mspapi = ofs3.app.Page.apidata
-    local apiList = mspapi.api
-    local values = mspapi.values
-
-    local totalRequests = #apiList  -- Total API calls to be made
-    local completedRequests = 0      -- Counter for completed requests
-
-    -- run a function in a module if it exists just prior to saving
-    if app.Page.preSave then app.Page.preSave(app.Page) end
-
-    for apiID, apiNAME in ipairs(apiList) do
-        log("Saving data for API: " .. apiNAME, "debug")
-
-        local payloadData = values[apiNAME]
-        local payloadStructure = mspapi.structure[apiNAME]
-
-        -- Initialise the API
-        local API = ofs3.tasks.msp.api.load(apiNAME)
-        API.setErrorHandler(function(self, buf)
-            app.triggers.saveFailed = true
-        end
-        )
-        API.setCompleteHandler(function(self, buf)
-            completedRequests = completedRequests + 1
-            log("API " .. apiNAME .. " write complete", "debug")
-
-            -- Check if this is the last completed request
-            if completedRequests == totalRequests then
-                log("All API requests have been completed!", "debug")
-                
-                -- Run the postSave function if it exists
-                if app.Page.postSave then app.Page.postSave(app.Page) end
-
-                -- we need to save to epprom etc
-                app.settingsSaved()
-
-            end
-        end)
-
-        -- Create lookup table for fields by apikey
-        local fieldMap = {}
-        local fieldMapBitmap = {}
-        for fidx, f in ipairs(app.Page.apidata.formdata.fields) do
-            if not f.bitmap then
-                -- normal fields
-                if f.mspapi == apiID then
-                    fieldMap[f.apikey] = fidx
-                end
-            else
-                -- bitmap fields
-                local bitmap_part1, bitmap_part2 = string.match(f.apikey, "([^%-]+)%-%>(.+)")
-                if not fieldMapBitmap[bitmap_part1] then
-                    fieldMapBitmap[bitmap_part1] = {}
-                end
-                fieldMapBitmap[bitmap_part1][f.bitmap] = fidx
-            end    
-        end
-
-
-        -- Inject values into the payload
-        for i, v in pairs(payloadData) do
-            local fieldIndex = fieldMap[i]
-            if fieldIndex then
-                -- Normal field
-                payloadData[i] = app.Page.fields[fieldIndex].value
-            elseif fieldMapBitmap[i] then
-                -- Bitmap field
-                local originalValue = tonumber(v) or 0
-                local newValue = originalValue
-        
-                for bit, fieldIndex in pairs(fieldMapBitmap[i]) do
-                    local fieldVal = math.floor(tonumber(app.Page.fields[fieldIndex].value) or 0)
-                    local mask = 1 << (bit)
-                    if fieldVal ~= 0 then
-                        newValue = newValue | mask  -- Set bit
-                    else
-                        newValue = newValue & (~mask)  -- Clear bit
-                    end
-                end
-        
-                payloadData[i] = newValue
-            end
-        
-        end
-
-
-        -- Send the payload
-        for i, v in pairs(payloadData) do
-            log("Set value for " .. i .. " to " .. v, "debug")
-            API.setValue(i, v)
-        end
-        
-             
-
-        API.write()
-    end
-    
-end
-
---[[
-    Updates the page with new values received from the MSP and API structures.
-    This function handles both initial values and attributes in one loop to prevent too many cascading loops.
-
-    @param values - Table containing the new values to update the form with.
-    @param structure - Table containing the structure of the MSP and API data.
-
-    The function performs the following steps:
-    1. Ensures that `app.Page.apidata.formdata`, `app.Page.apidata.api`, and `ofs3.app.Page.fields` exist.
-    2. Defines a helper function `combined_api_parts` to split and convert API keys.
-    3. Creates a reversed API table for quick lookups if it doesn't already exist.
-    4. Iterates over the form fields and updates them based on the provided values and structure.
-    5. Logs debug information and handles cases where fields or values are missing.
---]]
-function app.mspApiUpdateFormAttributes(values, structure)
-    -- Ensure app.Page and its mspapi.formdata exist
-    if not (app.Page.apidata.formdata and app.Page.apidata.api and ofs3.app.Page.fields) then
-        log("app.Page.apidata.formdata or its components are nil", "debug")
-        return
-    end
-
-    local function combined_api_parts(s)
-        local part1, part2 = s:match("^([^:]+):([^:]+)$")
-    
-        if part1 and part2 then
-            local num = tonumber(part1)
-            if num then
-                part1 = num  -- Convert string to number
-            else
-                -- Fast lookup in precomputed table
-                part1 = app.Page.apidata.api_reversed[part1] or nil
-            end
-    
-            if part1 then
-                return { part1, part2 }
-            end
-        end
-    
-        return nil
-    end
-
-    local fields = app.Page.apidata.formdata.fields
-    local api = app.Page.apidata.api
-
-    -- Create a reversed API table for quick lookups
-    if not app.Page.apidata.api_reversed then
-        app.Page.apidata.api_reversed = {}
-        for index, value in pairs(app.Page.apidata.api) do
-            app.Page.apidata.api_reversed[value] = index
-        end
-    end
-
-    for i, f in ipairs(fields) do
-        -- Define some key details
-        local formField = ofs3.app.formFields[i]
-
-        if type(formField) == 'userdata' then
-
-            -- Check if the field has an API key and extract the parts if needed
-            -- we do not need to handle this on the save side as read has simple
-            -- populated the mspapi and api fierds in the formdata.fields
-            -- meaning they are already in the correct format
-            if f.api then
-                log("API field found: " .. f.api, "debug")
-                local parts = combined_api_parts(f.api)
-                if parts then
-                f.mspapi = parts[1]
-                f.apikey = parts[2]
-                end
-            end
-
-            local apikey = f.apikey
-            local mspapiID = f.mspapi
-            local mspapiNAME = api[mspapiID]
-            local targetStructure = structure[mspapiNAME]
-
-            if mspapiID  == nil or mspapiID  == nil then 
-                log("API field missing mspapi or apikey", "debug")
-            else        
-                for _, v in ipairs(targetStructure) do
-
-                    if not v.bitmap then
-                        -- we have a standard api field - proceed to injecting values
-                        if v.field == apikey and mspapiID == f.mspapi then
-
-                            -- insert help string
-                            local help_target = "api." .. mspapiNAME .. "." .. apikey
-                            local help_return = i18n(help_target)
-                            if help_target ~=  help_return then
-                                v.help = help_return
-                            else
-                                v.help = nil    
-                            end
-
-                            ofs3.app.ui.injectApiAttributes(formField, f, v)
-
-                            local scale = f.scale or 1
-                            if values and values[mspapiNAME] and values[mspapiNAME][apikey] then
-                                ofs3.app.Page.fields[i].value = values[mspapiNAME][apikey] / scale
-                            end
-
-                            if values[mspapiNAME][apikey] == nil then
-                                log("API field value is nil: " .. mspapiNAME .. " " .. apikey, "info")
-                                formField:enable(false)
-                            end
-
-                            break -- Found field, can move on
-                        end
-                    else
-                        -- bitmap fields 
-                        for bidx, b in ipairs(v.bitmap) do
-                            local bitmapField = v.field .. "->" .. b.field
-
-                            if bitmapField  == apikey  and mspapiID == f.mspapi then
-                                    -- we have now found a bitmap field so should proceed with injecting
-                                    -- the values into the form field
-                                    -- insert help string
-                                    local help_target = "api." .. mspapiNAME .. "." .. apikey
-                                    local help_return = i18n(help_target)
-                                    if help_target ~=  help_return then
-                                        v.help = help_return
-                                    else
-                                        v.help = nil    
-                                    end
-
-                                    ofs3.app.ui.injectApiAttributes(formField, f, b)
-
-                                    local scale = f.scale or 1
-
-                                    -- extract bit at position bidx
-                                    if values and values[mspapiNAME] and values[mspapiNAME][v.field] then
-                                        local raw_value = values[mspapiNAME][v.field]
-                                        local bit_value = (raw_value >> bidx - 1) & 1  
-                                        ofs3.app.Page.fields[i].value = bit_value / scale
-                                    end
-        
-                                    if values[mspapiNAME][v.field] == nil then
-                                        log("API field value is nil: " .. mspapiNAME .. " " .. apikey, "info")
-                                        formField:enable(false)
-                                    end
-
-                                    -- insert bit location for later reference
-                                    ofs3.app.Page.fields[i].bitmap = bidx - 1
-
-
-                            end    
-                        end
-                    end    
-                end
-            end
-        else
-            log("Form field skipped; not valid for this api version?", "debug")    
-        end    
-    end
-    collectgarbage()
-    utils.reportMemoryUsage("app.mspApiUpdateFormAttributes")
-
-    -- set focus back to menu
-    ofs3.app.formNavigationFields['menu']:focus(true)
-end
-
-
---[[
-    requestPage - Requests a page using the new API form system.
-
-    This function ensures that the necessary API and form data exist, initializes
-    the state if needed, and processes API calls sequentially. It prevents duplicate
-    execution if already running and handles both API success and error cases.
-
-    The function performs the following steps:
-    1. Checks if app.Page.apidata and its api/formdata exist.
-    2. Initializes the apiState if not already initialized.
-    3. Prevents duplicate execution by checking the isProcessing flag.
-    4. Initializes values and structure on the first run.
-    5. Processes each API call sequentially using a recursive function.
-    6. Handles API success by storing the response and moving to the next API.
-    7. Handles API errors by logging the error and moving to the next API.
-    8. Resets the state and triggers postRead and postLoad functions if they exist.
-
-    Note: The function uses log for logging and ofs3.tasks.msp.api.load
-    for loading the API. It also updates form attributes and manages progress loader triggers.
-]]
-local function requestPage()
-    -- Ensure app.Page and its mspapi.api exist
-    if not app.Page.apidata then
-        return
-    end
-
-    if not app.Page.apidata.api and not app.Page.apidata.formdata then
-        log("app.Page.apidata.api did not pass consistancy checks", "debug")
-        return
-    end
-
-    if not ofs3.app.Page.apidata.apiState then
-        ofs3.app.Page.apidata.apiState = {
-            currentIndex = 1,
-            isProcessing = false
-        }
-    end    
-
-    local apiList = app.Page.apidata.api
-    local state = ofs3.app.Page.apidata.apiState  -- Reference persistent state
-
-    -- Prevent duplicate execution if already running
-    if state.isProcessing then
-        log("requestPage is already running, skipping duplicate call.", "debug")
-        return
-    end
-    state.isProcessing = true  -- Set processing flag
-
-    if not ofs3.app.Page.apidata.values then
-        log("requestPage Initialize values on first run", "debug")
-        ofs3.app.Page.apidata.values = {}  -- Initialize if first run
-        ofs3.app.Page.apidata.structure = {}  -- Initialize if first run
-        ofs3.app.Page.apidata.receivedBytesCount = {}  -- Initialize if first run
-        ofs3.app.Page.apidata.receivedBytes = {}  -- Initialize if first run
-        ofs3.app.Page.apidata.positionmap = {}  -- Initialize if first run
-        ofs3.app.Page.apidata.other = {} 
-    end
-
-    -- Ensure state.currentIndex is initialized
-    if state.currentIndex == nil then
-        state.currentIndex = 1
-    end
-
--- Function to check for unresolved timeouts and trigger an alert
-local function checkForUnresolvedTimeouts()
-    if not app or not app.Page or not app.Page.apidata then return end
-
-    local hasUnresolvedTimeouts = false
-    for apiKey, retries in pairs(app.Page.apidata.retryCount or {}) do
-        if retries >= 3 then
-            hasUnresolvedTimeouts = true
-            log("[ALERT] API " .. apiKey .. " failed after 3 timeouts.", "info")
-        end
-    end
-
-    if hasUnresolvedTimeouts then
-        -- disable all fields leaving only menu enabled
-        ofs3.app.ui.disableAllFields()
-        ofs3.app.ui.disableAllNavigationFields()
-        ofs3.app.ui.enableNavigationField('menu')
-        ofs3.app.triggers.closeProgressLoader = true
-    end
-end
-
--- Recursive function to process API calls sequentially
-local function processNextAPI()
-    -- **Exit gracefully if the app is closing**
-    if not app or not app.Page or not app.Page.apidata then
-        log("App is closing. Stopping processNextAPI.", "debug")
-        return
-    end
-
-    if state.currentIndex > #apiList or #apiList == 0 then
-        if state.isProcessing then  
-            state.isProcessing = false  
-            state.currentIndex = 1  
-
-            app.triggers.isReady = true
-
-            if app.Page.postRead then 
-                app.Page.postRead(app.Page) 
-            end
-
-            app.mspApiUpdateFormAttributes(app.Page.apidata.values, app.Page.apidata.structure)
-
-            if app.Page.postLoad then 
-                app.Page.postLoad(app.Page) 
-            else
-                ofs3.app.triggers.closeProgressLoader = true    
-            end
-
-            -- **Check for unresolved timeouts AFTER all APIs have been processed**
-            checkForUnresolvedTimeouts()  -- 🔹 Added here
-        end
-        return
-    end
-
-    local v = apiList[state.currentIndex]
-    local apiKey = type(v) == "string" and v or v.name 
-
-    if not apiKey then
-        log("API key is missing for index " .. tostring(state.currentIndex), "warning")
-        state.currentIndex = state.currentIndex + 1
-        ofs3.tasks.callback.inSeconds(0.5, processNextAPI)
-        return
-    end
-
-    local API = ofs3.tasks.msp.api.load(v)
-
-    -- **Ensure retryCount table exists**
-    if app and app.Page and app.Page.apidata then
-        app.Page.apidata.retryCount = app.Page.apidata.retryCount or {}  
-    end
-
-    local retryCount = app.Page.apidata.retryCount[apiKey] or 0
-    local handled = false
-
-    -- **Log API Start**
-    log("[PROCESS] API: " .. apiKey .. " (Attempt " .. (retryCount + 1) .. ")", "debug")
-
-    -- **Timeout handler function**
-    local function handleTimeout()
-        if handled then return end
-        handled = true  
-
-        -- **Exit safely if app is closed**
-        if not app or not app.Page or not app.Page.apidata then
-            log("App is closing. Timeout handling skipped.", "debug")
-            return
-        end
-
-        retryCount = retryCount + 1  
-        app.Page.apidata.retryCount[apiKey] = retryCount  
-
-        if retryCount < 3 then  
-            log("[TIMEOUT] API: " .. apiKey .. " (Retry " .. retryCount .. ")", "warning")
-            ofs3.tasks.callback.inSeconds(0.5, processNextAPI)  
-        else
-            log("[TIMEOUT FAIL] API: " .. apiKey .. " failed after 3 attempts. Skipping.", "error")
-            state.currentIndex = state.currentIndex + 1
-            ofs3.tasks.callback.inSeconds(0.5, processNextAPI)  
-        end
-    end
-
-    -- **Schedule timeout callback**
-    ofs3.tasks.callback.inSeconds(2, handleTimeout)
-
-    -- **API success handler**
-    API.setCompleteHandler(function(self, buf)
-        if handled then return end
-        handled = true  
-
-        -- **Exit safely if app is closed**
-        if not app or not app.Page or not app.Page.apidata then
-            log("App is closing. Skipping API success handling.", "debug")
-            return
-        end
-
-        -- **Log API Success**
-        log("[SUCCESS] API: " .. apiKey .. " completed successfully.", "debug")
-
-        app.Page.apidata.values[apiKey] = API.data().parsed
-        app.Page.apidata.structure[apiKey] = API.data().structure
-        app.Page.apidata.receivedBytes[apiKey] = API.data().buffer
-        app.Page.apidata.receivedBytesCount[apiKey] = API.data().receivedBytesCount
-        app.Page.apidata.positionmap[apiKey] = API.data().positionmap
-        app.Page.apidata.other[apiKey] = API.data().other or {}
-
-        -- **Reset retry count on success**
-        app.Page.apidata.retryCount[apiKey] = 0  
-
-        state.currentIndex = state.currentIndex + 1
-        ofs3.tasks.callback.inSeconds(0.5, processNextAPI)  
-    end)
-
-    -- **API error handler**
-    API.setErrorHandler(function(self, err)
-        if handled then return end
-        handled = true  
-
-        -- **Exit safely if app is closed**
-        if not app or not app.Page or not app.Page.apidata then
-            log("App is closing. Skipping API error handling.", "debug")
-            return
-        end
-
-        retryCount = retryCount + 1  
-        app.Page.apidata.retryCount[apiKey] = retryCount  
-
-        if retryCount < 3 then  
-            log("[ERROR] API: " .. apiKey .. " failed (Retry " .. retryCount .. "): " .. tostring(err), "warning")
-            ofs3.tasks.callback.inSeconds(0.5, processNextAPI)  
-        else
-            log("[ERROR FAIL] API: " .. apiKey .. " failed after 3 attempts. Skipping.", "error")
-            state.currentIndex = state.currentIndex + 1
-            ofs3.tasks.callback.inSeconds(0.5, processNextAPI)  
-        end
-    end)
-
-    API.read()
-end
-
-    -- Start processing the first API
-    processNextAPI()
-end
 
 --[[
     Updates the current telemetry state. This function is called frequently to check the telemetry status.
@@ -963,7 +382,7 @@ app._uiTasks = {
     if (os.clock() - app.dialogs.saveWatchDog) > timeout
        or (app.dialogs.saveProgressCounter > 120 ) then
       app.audio.playTimeout = true
-      app.ui.progressDisplaySaveMessage(i18n("app.error_timed_out"))
+      app.ui.progressDisplaySaveMessage("@i18n(app.error_timed_out)@")
       app.ui.progressDisplaySaveCloseAllowed(true)
       app.dialogs.save:value(100)
       app.dialogs.saveProgressCounter = 0
@@ -981,7 +400,7 @@ app._uiTasks = {
     app.ui.progressDisplayValue(app.dialogs.progressCounter)
     if (os.clock() - app.dialogs.progressWatchDog) > 5 then
       app.audio.playTimeout = true
-      app.ui.progressDisplayMessage(i18n("app.error_timed_out"))
+      app.ui.progressDisplayMessage("@i18n(app.error_timed_out)@")
       app.ui.progressDisplayCloseAllowed(true)
       app.Page = app.PageTmp
       app.PageTmp = nil
@@ -996,17 +415,17 @@ app._uiTasks = {
       app.triggers.triggerSave = false
       form.openDialog({
         width   = nil,
-        title   = i18n("app.msg_save_settings"),
+        title   = "@i18n(app.msg_save_settings)@",
         message = (app.Page.extraMsgOnSave and
-                   i18n("app.msg_save_current_page").."\n\n"..app.Page.extraMsgOnSave or
-                   i18n("app.msg_save_current_page")),
-        buttons = {{ label=i18n("app.btn_ok"), action=function()
+                   "@i18n(app.msg_save_current_page)@".."\n\n"..app.Page.extraMsgOnSave or
+                   "@i18n(app.msg_save_current_page)@"),
+        buttons = {{ label="@i18n(app.btn_ok)@", action=function()
           app.PageTmp = app.Page
 
           app.triggers.isSaving = true
           saveSettings()
           return true
-        end },{ label=i18n("app.btn_cancel"),action=function() return true end }},
+        end },{ label="@i18n(app.btn_cancel)@",action=function() return true end }},
         wakeup = function() end,
         paint  = function() end,
         options= TEXT_LEFT
@@ -1028,19 +447,19 @@ app._uiTasks = {
     if app.triggers.triggerReload then
       app.triggers.triggerReload = false
       form.openDialog({
-        title   = i18n("reload"):gsub("^%l", string.upper),
-        message = i18n("app.msg_reload_settings"),
-        buttons = {{ label=i18n("app.btn_ok"), action=function() app.triggers.reload = true; return true end },
-                   { label=i18n("app.btn_cancel"), action=function() return true end }},
+        title   = "@i18n(reload)@",
+        message = "@i18n(app.msg_reload_settings)@",
+        buttons = {{ label="@i18n(app.btn_ok)@", action=function() app.triggers.reload = true; return true end },
+                   { label="@i18n(app.btn_cancel)@", action=function() return true end }},
         options = TEXT_LEFT
       })
     elseif app.triggers.triggerReloadFull then
       app.triggers.triggerReloadFull = false
       form.openDialog({
-        title   = i18n("reload"):gsub("^%l", string.upper),
-        message = i18n("app.msg_reload_settings"),
-        buttons = {{ label=i18n("app.btn_ok"), action=function() app.triggers.reloadFull = true; return true end },
-                   { label=i18n("app.btn_cancel"), action=function() return true end }},
+        title   = "@i18n(reload)@",
+        message = "@i18n(app.msg_reload_settings)@",
+        buttons = {{ label="@i18n(app.btn_ok)@", action=function() app.triggers.reloadFull = true; return true end },
+                   { label="@i18n(app.btn_cancel)@", action=function() return true end }},
         options = TEXT_LEFT
       })
     end
@@ -1057,10 +476,8 @@ app._uiTasks = {
           app.ui.progressDisplaySave()
           ofs3.tasks.msp.mspQueue.retryCount = 0
         end
-        local msg = ({[app.pageStatus.saving] = "app.msg_saving_settings",
-                     [app.pageStatus.eepromWrite] = "app.msg_saving_settings",
-                     [app.pageStatus.rebooting]   = "app.msg_rebooting"})[app.pageState]
-        app.ui.progressDisplaySaveValue(app.dialogs.saveProgressCounter, i18n(msg))
+
+        app.ui.progressDisplaySaveValue(app.dialogs.saveProgressCounter, "@i18n(app.pageStatus.saving)")
       else
         app.triggers.isSaving      = false
         app.dialogs.saveDisplay    = false
@@ -1072,22 +489,6 @@ app._uiTasks = {
     end
   end,
 
-  -- 10. Armed-Save Warning
-  function()
-    if not app.triggers.showSaveArmedWarning or app.triggers.closeSave then return end
-    if not app.dialogs.progressDisplay then
-      app.dialogs.progressCounter = 0
-      local key = (ofs3.session.apiVersion >= 12.08 and "app.msg_please_disarm_to_save_warning" or "app.msg_please_disarm_to_save")
-      app.ui.progressDisplay(
-        i18n("app.msg_save_not_commited"),
-        i18n(key)
-      )
-    end
-    if app.dialogs.progressCounter >= 100 then
-      app.triggers.showSaveArmedWarning = false
-      app.ui.progressDisplayClose()
-    end
-  end,
 
   -- 11. Telemetry & Page State Updates
   function()
@@ -1220,6 +621,8 @@ end
     6. Opens the main menu UI.
 ]]
 function app.create()
+
+    app.ui = assert(compile("app/lib/ui.lua"))(config)
 
     -- ofs3.session.apiVersion = nil
     config.environment = system.getVersion()

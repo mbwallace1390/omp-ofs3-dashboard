@@ -19,7 +19,7 @@
 
 ]] --
 local utils = {}
-local i18n = ofs3.i18n.get
+
 
 
 local arg = {...}
@@ -143,26 +143,60 @@ end
 --- @param flags number The bitfield representing arming disable flags.
 --- @return string A comma-separated string of human-readable flag descriptions, or "OK" if no flags are set.
 function utils.armingDisableFlagsToString(flags)
-    if flags == nil then
-        return i18n("app.modules.status.ok"):upper()
+
+    local ARMING_DISABLE_FLAG_TAG = {
+    [0]  = "@i18n(app.modules.fblstatus.arming_disable_flag_0):upper()@",
+    [1]  = "@i18n(app.modules.fblstatus.arming_disable_flag_1):upper()@",
+    [2]  = "@i18n(app.modules.fblstatus.arming_disable_flag_2):upper()@",
+    [3]  = "@i18n(app.modules.fblstatus.arming_disable_flag_3):upper()@",
+    [4]  = "@i18n(app.modules.fblstatus.arming_disable_flag_4):upper()@",
+    [5]  = "@i18n(app.modules.fblstatus.arming_disable_flag_5):upper()@",
+    [6]  = "@i18n(app.modules.fblstatus.arming_disable_flag_6):upper()@",
+    [7]  = "@i18n(app.modules.fblstatus.arming_disable_flag_7):upper()@",
+    [8]  = "@i18n(app.modules.fblstatus.arming_disable_flag_8):upper()@",
+    [9]  = "@i18n(app.modules.fblstatus.arming_disable_flag_9):upper()@",
+    [10] = "@i18n(app.modules.fblstatus.arming_disable_flag_10):upper()@",
+    [11] = "@i18n(app.modules.fblstatus.arming_disable_flag_11):upper()@",
+    [12] = "@i18n(app.modules.fblstatus.arming_disable_flag_12):upper()@",
+    [13] = "@i18n(app.modules.fblstatus.arming_disable_flag_13):upper()@",
+    [14] = "@i18n(app.modules.fblstatus.arming_disable_flag_14):upper()@",
+    [15] = "@i18n(app.modules.fblstatus.arming_disable_flag_15):upper()@",
+    [16] = "@i18n(app.modules.fblstatus.arming_disable_flag_16):upper()@",
+    [17] = "@i18n(app.modules.fblstatus.arming_disable_flag_17):upper()@",
+    [18] = "@i18n(app.modules.fblstatus.arming_disable_flag_18):upper()@",
+    [19] = "@i18n(app.modules.fblstatus.arming_disable_flag_19):upper()@",
+    [20] = "@i18n(app.modules.fblstatus.arming_disable_flag_20):upper()@",
+    [21] = "@i18n(app.modules.fblstatus.arming_disable_flag_21):upper()@",
+    [22] = "@i18n(app.modules.fblstatus.arming_disable_flag_22):upper()@",
+    [23] = "@i18n(app.modules.fblstatus.arming_disable_flag_23):upper()@",
+    [24] = "@i18n(app.modules.fblstatus.arming_disable_flag_24):upper()@",
+    [25] = "@i18n(app.modules.fblstatus.arming_disable_flag_25):upper()@",
+    }
+
+
+    -- No flags: localized OK (already uppercase via tag transform)
+    if flags == nil or flags == 0 then
+        return "@i18n(app.modules.fblstatus.ok):upper()@"
     end
 
     local names = {}
     for i = 0, 25 do
         if (flags & (1 << i)) ~= 0 then
-            local key = "app.modules.status.arming_disable_flag_" .. i
-            local name = i18n(key)
+            local name = ARMING_DISABLE_FLAG_TAG[i]
             if name and name ~= "" then
-                table.insert(names, name)
+                names[#names+1] = name
             end
         end
     end
 
     if #names == 0 then
-        return i18n("app.modules.status.ok"):upper()
+        return "@i18n(app.modules.fblstatus.ok):upper()@"
     end
 
-    return table.concat(names, ", "):upper()
+    -- NOTE: We avoid forcing uppercase here to preserve non-ASCII locales.
+    -- If you really want uppercase, you can do:
+    --   return (table.concat(names, ", ")):upper()
+    return table.concat(names, ", ")
 end
 
 -- get the governor text from the value
@@ -171,7 +205,7 @@ function utils.getGovernorState(value)
     local returnvalue
 
     if not ofs3.tasks.telemetry then
-        return i18n("widgets.governor.UNKNOWN")
+        return "@i18n(widgets.governor.UNKNOWN)@"
     end
 
     --[[
@@ -180,17 +214,17 @@ function utils.getGovernorState(value)
     If the key does not exist, assigns a localized "UNKNOWN" string to 'returnvalue' using 'i18n'.
     ]]    
     local map = {     
-        [0] =  i18n("widgets.governor.OFF"),
-        [1] =  i18n("widgets.governor.IDLE"),
-        [2] =  i18n("widgets.governor.SPOOLUP"),
-        [3] =  i18n("widgets.governor.RECOVERY"),
-        [4] =  i18n("widgets.governor.ACTIVE"),
-        [5] =  i18n("widgets.governor.THROFF"),
-        [6] =  i18n("widgets.governor.LOSTHS"),
-        [7] =  i18n("widgets.governor.AUTOROT"),
-        [8] =  i18n("widgets.governor.BAILOUT"),
-        [100] = i18n("widgets.governor.DISABLED"),
-        [101] = i18n("widgets.governor.DISARMED")
+        [0] =  "@i18n(widgets.governor.OFF)@",
+        [1] =  "@i18n(widgets.governor.IDLE)@",
+        [2] =  "@i18n(widgets.governor.SPOOLUP)@",
+        [3] =  "@i18n(widgets.governor.RECOVERY)@",
+        [4] =  "@i18n(widgets.governor.ACTIVE)@",
+        [5] =  "@i18n(widgets.governor.THROFF)@",
+        [6] =  "@i18n(widgets.governor.LOSTHS)@",
+        [7] =  "@i18n(widgets.governor.AUTOROT)@",
+        [8] =  "@i18n(widgets.governor.BAILOUT)@",
+        [100] = "@i18n(widgets.governor.DISABLED)@",
+        [101] = "@i18n(widgets.governor.DISARMED)@"
     }
 
     if ofs3.session and ofs3.session.apiVersion and ofs3.session.apiVersion > 12.07 then
@@ -203,7 +237,7 @@ function utils.getGovernorState(value)
     if map[value] then
         returnvalue = map[value]
     else
-        returnvalue = i18n("widgets.governor.UNKNOWN")
+        returnvalue = "@i18n(widgets.governor.UNKNOWN)@"
     end    
 
     --[[
@@ -528,7 +562,7 @@ function utils.print_r(node, maxDepth, currentDepth)
 
     table.insert(result, "}")
 
-    return table.concat(result, " ")
+    return print(table.concat(result, " "))
 end
 
 

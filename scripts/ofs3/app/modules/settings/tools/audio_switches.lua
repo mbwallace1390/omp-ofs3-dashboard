@@ -1,5 +1,5 @@
 local settings = {}
-local i18n = ofs3.i18n.get
+
 
 local function sensorNameMap(sensorList)
     local nameMap = {}
@@ -19,7 +19,7 @@ local function openPage(pageIdx, title, script)
     ofs3.app.lastScript = script
 
     ofs3.app.ui.fieldHeader(
-        i18n("app.modules.settings.name") .. " / " .. i18n("app.modules.settings.audio") .. " / " .. i18n("app.modules.settings.txt_audio_switches")
+        "@i18n(app.modules.settings.name)@" .. " / " .. "@i18n(app.modules.settings.audio)@" .. " / " .. "@i18n(app.modules.settings.txt_audio_switches)@"
     )
     ofs3.session.formLineCnt = 0
 
@@ -72,7 +72,7 @@ local function onNavMenu()
     ofs3.app.ui.progressDisplay()
     ofs3.app.ui.openPage(
         pageIdx,
-        i18n("app.modules.settings.name"),
+        "@i18n(app.modules.settings.name)@",
         "settings/tools/audio.lua"
     )
 end
@@ -80,9 +80,9 @@ end
 local function onSaveMenu()
     local buttons = {
         {
-            label  = i18n("app.btn_ok_long"),
+            label  = "@i18n(app.btn_ok_long)@",
             action = function()
-                local msg = i18n("app.modules.profile_select.save_prompt_local")
+                local msg = "@i18n(app.modules.profile_select.save_prompt_local)@"
                 ofs3.app.ui.progressDisplaySave(msg:gsub("%?$", "."))
                 for key, value in pairs(settings) do
                     ofs3.preferences.switches[key] = value
@@ -97,7 +97,7 @@ local function onSaveMenu()
             end,
         },
         {
-            label  = i18n("app.modules.profile_select.cancel"),
+            label  = "@i18n(app.modules.profile_select.cancel)@",
             action = function()
                 return true
             end,
@@ -106,8 +106,8 @@ local function onSaveMenu()
 
     form.openDialog({
         width   = nil,
-        title   = i18n("app.modules.profile_select.save_settings"),
-        message = i18n("app.modules.profile_select.save_prompt_local"),
+        title   = "@i18n(app.modules.profile_select.save_settings)@",
+        message = "@i18n(app.modules.profile_select.save_prompt_local)@",
         buttons = buttons,
         wakeup  = function() end,
         paint   = function() end,
@@ -120,7 +120,7 @@ local function event(widget, category, value, x, y)
     if category == EVT_CLOSE and value == 0 or value == 35 then
         ofs3.app.ui.openPage(
             pageIdx,
-            i18n("app.modules.settings.name"),
+            "@i18n(app.modules.settings.name)@",
             "settings/tools/audio.lua"
         )
         return true

@@ -1,6 +1,6 @@
 local settings = {}
 local settings_model = {}
-local i18n = ofs3.i18n.get
+
 local themeList = ofs3.widgets.dashboard.listThemes() 
 local formattedThemes = {}
 local formattedThemesModel = {}
@@ -30,7 +30,7 @@ local function generateThemeList()
     end
 
     -- build model table
-    table.insert(formattedThemesModel, { i18n("app.modules.settings.dashboard_theme_panel_model_disabled"), 0 })
+    table.insert(formattedThemesModel, { "@i18n(app.modules.settings.dashboard_theme_panel_model_disabled)@", 0 })
     for i, theme in ipairs(themeList) do
         table.insert(formattedThemesModel, { theme.name, theme.idx })
     end   
@@ -46,7 +46,7 @@ local function openPage(pageIdx, title, script)
     ofs3.app.lastScript = script
 
     ofs3.app.ui.fieldHeader(
-        i18n("app.modules.settings.name") .. " / " .. i18n("app.modules.settings.dashboard") .. " / " .. i18n("app.modules.settings.dashboard_theme")
+        "@i18n(app.modules.settings.name)@" .. " / " .. "@i18n(app.modules.settings.dashboard)@" .. " / " .. "@i18n(app.modules.settings.dashboard_theme)@"
     )
     ofs3.session.formLineCnt = 0
 
@@ -58,13 +58,13 @@ local function openPage(pageIdx, title, script)
     -- ===========================================================================
     -- create global theme selection panel
     -- ===========================================================================
-    local global_panel = form.addExpansionPanel(i18n("app.modules.settings.dashboard_theme_panel_global"))
+    local global_panel = form.addExpansionPanel("@i18n(app.modules.settings.dashboard_theme_panel_global)@")
     global_panel:open(true) 
 
     -- preflight theme selection
     formFieldCount = formFieldCount + 1
     ofs3.session.formLineCnt = ofs3.session.formLineCnt + 1
-    ofs3.app.formLines[ofs3.session.formLineCnt] = global_panel:addLine(i18n("app.modules.settings.dashboard_theme_preflight"))
+    ofs3.app.formLines[ofs3.session.formLineCnt] = global_panel:addLine("@i18n(app.modules.settings.dashboard_theme_preflight)@")
             
     ofs3.app.formFields[formFieldCount] = form.addChoiceField(ofs3.app.formLines[ofs3.session.formLineCnt], nil, 
                                                         formattedThemes, 
@@ -91,7 +91,7 @@ local function openPage(pageIdx, title, script)
     -- inflight theme selection                                                          
     formFieldCount = formFieldCount + 1
     ofs3.session.formLineCnt = ofs3.session.formLineCnt + 1
-    ofs3.app.formLines[ofs3.session.formLineCnt] = global_panel:addLine(i18n("app.modules.settings.dashboard_theme_inflight"))
+    ofs3.app.formLines[ofs3.session.formLineCnt] = global_panel:addLine("@i18n(app.modules.settings.dashboard_theme_inflight)@")
                               
     ofs3.app.formFields[formFieldCount] = form.addChoiceField(ofs3.app.formLines[ofs3.session.formLineCnt], nil, 
                                                         formattedThemes, 
@@ -119,7 +119,7 @@ local function openPage(pageIdx, title, script)
      -- postflight theme selection                                                            
     formFieldCount = formFieldCount + 1
     ofs3.session.formLineCnt = ofs3.session.formLineCnt + 1
-    ofs3.app.formLines[ofs3.session.formLineCnt] = global_panel:addLine(i18n("app.modules.settings.dashboard_theme_postflight"))
+    ofs3.app.formLines[ofs3.session.formLineCnt] = global_panel:addLine("@i18n(app.modules.settings.dashboard_theme_postflight)@")
                                     
     ofs3.app.formFields[formFieldCount] = form.addChoiceField(ofs3.app.formLines[ofs3.session.formLineCnt], nil, 
                                                         formattedThemes, 
@@ -150,7 +150,7 @@ local function onNavMenu()
     ofs3.app.ui.progressDisplay()
         ofs3.app.ui.openPage(
             pageIdx,
-            i18n("app.modules.settings.dashboard"),
+            "@i18n(app.modules.settings.dashboard)@",
             "settings/tools/dashboard.lua"
         )
         return true
@@ -159,9 +159,9 @@ end
 local function onSaveMenu()
     local buttons = {
         {
-            label  = i18n("app.btn_ok_long"),
+            label  = "@i18n(app.btn_ok_long)@",
             action = function()
-                local msg = i18n("app.modules.profile_select.save_prompt_local")
+                local msg = "@i18n(app.modules.profile_select.save_prompt_local)@"
                 ofs3.app.ui.progressDisplaySave(msg:gsub("%?$", "."))
 
                 -- save global dashboard settings
@@ -181,7 +181,7 @@ local function onSaveMenu()
             end,
         },
         {
-            label  = i18n("app.modules.profile_select.cancel"),
+            label  = "@i18n(app.modules.profile_select.cancel)@",
             action = function()
                 return true
             end,
@@ -190,8 +190,8 @@ local function onSaveMenu()
 
     form.openDialog({
         width   = nil,
-        title   = i18n("app.modules.profile_select.save_settings"),
-        message = i18n("app.modules.profile_select.save_prompt_local"),
+        title   = "@i18n(app.modules.profile_select.save_settings)@",
+        message = "@i18n(app.modules.profile_select.save_prompt_local)@",
         buttons = buttons,
         wakeup  = function() end,
         paint   = function() end,
@@ -204,7 +204,7 @@ local function event(widget, category, value, x, y)
     if category == EVT_CLOSE and value == 0 or value == 35 then
         ofs3.app.ui.openPage(
             pageIdx,
-            i18n("app.modules.settings.dashboard"),
+            "@i18n(app.modules.settings.dashboard)@",
             "settings/tools/dashboard.lua"
         )
         return true

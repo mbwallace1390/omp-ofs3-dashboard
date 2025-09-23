@@ -1,5 +1,5 @@
 local utils = assert(ofs3.compiler.loadfile("SCRIPTS:/" .. ofs3.config.baseDir .. "/app/modules/logs/lib/utils.lua"))()
-local i18n = ofs3.i18n.get
+
 local triggerOverRide = false
 local triggerOverRideAll = false
 local lastServoCountTime = os.clock()
@@ -130,7 +130,7 @@ local function openPage(pidx, title, script, displaymode)
     if #dates == 0 then
 
         LCD_W, LCD_H = ofs3.utils.getWindowSize()
-        local str = i18n("app.modules.logs.msg_no_logs_found")
+        local str = "@i18n(app.modules.logs.msg_no_logs_found)@"
         local ew = LCD_W
         local eh = LCD_H
         local etsizeW, etsizeH = lcd.getTextSize(str)

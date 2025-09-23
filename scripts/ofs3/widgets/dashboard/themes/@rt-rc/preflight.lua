@@ -15,7 +15,7 @@
  * Note: Some icons have been sourced from https://www.flaticon.com/
 ]]--
 
-local i18n = ofs3.i18n.get
+
 local utils = ofs3.widgets.dashboard.utils
 local boxes_cache = nil
 local themeconfig = nil
