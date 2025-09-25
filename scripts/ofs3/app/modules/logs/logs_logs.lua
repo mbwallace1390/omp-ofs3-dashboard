@@ -180,6 +180,10 @@ local function openPage(pidx, title, script, displaymode)
                                 ofs3.app.formFields[pidx]:focus()
                             end
 
+                            if not ofs3.tasks or not ofs3.tasks.active() then
+                                ofs3.app.formFields[pidx]:enable(false)
+                            end
+
                             lc = (lc + 1) % numPerRow
 
                 end
