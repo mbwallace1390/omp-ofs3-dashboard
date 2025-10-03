@@ -21,8 +21,6 @@ local function openPage(pidx, title, script)
     ofs3.app.lastTitle = title
     ofs3.app.lastScript = script
 
-    ESC = {}
-
     -- size of buttons
     if ofs3.preferences.general.iconsize == nil or ofs3.preferences.general.iconsize == "" then
         ofs3.preferences.general.iconsize = 1
@@ -40,7 +38,7 @@ local function openPage(pidx, title, script)
 
     form.addLine(title)
 
-    buttonW = 100
+    local buttonW = 100
     local x = windowWidth - buttonW - 10
 
     ofs3.app.formNavigationFields['menu'] = form.addButton(line, {x = x, y = ofs3.app.radio.linePaddingTop, w = buttonW, h = ofs3.app.radio.navbuttonHeight}, {
@@ -99,6 +97,7 @@ local function openPage(pidx, title, script)
     local pages = S_PAGES
     local lc = 0
     local bx = 0
+    local y = 0
 
 
 

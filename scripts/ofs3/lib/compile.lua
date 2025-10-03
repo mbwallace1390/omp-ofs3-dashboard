@@ -1,37 +1,35 @@
 --[[
-
- * Copyright (C) ofs3 Project
- *
+ * ofs3 - Deferred/Throttled Lua Script Compilation and Caching (ENV-aware, keyed by config.baseDir)
  * License GPLv3: https://www.gnu.org/licenses/gpl-3.0.en.html
- *
- * compile.lua - Deferred/Throttled Lua Script Compilation and Caching for ofs3 Suite (Ethos)
-
- * Usage:
- *   local compile = require("ofs3.lib.compile")
- *   local chunk = compile.loadfile("myscript.lua")
- *   chunk() -- executes the loaded script
- *   -- Or use compile.dofile / compile.require as drop-in replacements
-
-]] --
---[[
- * Copyright (C) ofs3 Project
- * License GPLv3: https://www.gnu.org/licenses/gpl-3.0.en.html
- * compile.lua - Deferred/Throttled Lua Script Compilation and Caching for ofs3 Suite (Ethos)
-
- * Usage:
- *   local compile = require("ofs3.lib.compile")
- *   local chunk = compile.loadfile("myscript.lua")
- *   chunk() -- executes the loaded script
- *   -- Or use compile.dofile / compile.require as drop-in replacements
 ]]
 
 local compile = {}
 local arg = {...}
+local config = arg[1] or {}
+-- Use the suite key passed from main.lua (ofs3.config.baseDir = "ofs3")
+local SUITE = (config and config.baseDir) or "suite"
+
+-- Capture the environment we were loaded with so all subsequent loads
+-- run with the same `_ENV` (which includes `ofs3` from main.lua).
+local ENV = _ENV or _G
+
+-- Helper to load files inside ENV (Lua 5.2+/5.3) with 5.1 fallback
+local function loadfile_in_env(path)
+  if setfenv and _VERSION == "Lua 5.1" then
+    local chunk, err = loadfile(path)
+    if not chunk then return nil, err end
+    setfenv(chunk, ENV)
+    return chunk
+  else
+    -- nil mode: accept text/bytecode; run under ENV (more ETHOS-compatible)
+    return loadfile(path, nil, ENV)
+  end
+end
 
 compile._startTime = os.clock()
 compile._startupDelay = 15 -- seconds before starting any compiles
 
--- Configuration: expects ofs3.config to be globally available
+-- Configuration: expects ofs3.config to be available via ENV
 local logTimings = true
 if ofs3 and ofs3.config then
   if type(ofs3.preferences.developer.compilerTiming) == "boolean" then
@@ -39,44 +37,38 @@ if ofs3 and ofs3.config then
   end
 end
 
+-- Suite-specific compiled directory to avoid cross-suite clashes
 local baseDir     = "./"
-local compiledDir = baseDir .. "cache/"
+local compiledDir = baseDir .. "cache/" .. SUITE .. "/"
 local SCRIPT_PREFIX = "SCRIPTS:"
 
--- Ensure cache directory exists
-local function ensure_dir(dir)
-  if os.mkdir then
-    local found = false
-    for _, name in ipairs(system.listFiles(baseDir)) do
-      if name == "cache" then found = true; break end
-    end
-    if not found then os.mkdir(dir) end
-  end
-end
-ensure_dir(compiledDir)
+-- Ensure cache directories exist
+os.mkdir("cache")
+os.mkdir(compiledDir)
 
 -- On-disk compiled files index
 local disk_cache = {}
 do
-  for _, fname in ipairs(system.listFiles(compiledDir)) do
+  local list = system.listFiles and system.listFiles(compiledDir) or {}
+  for _, fname in ipairs(list) do
     disk_cache[fname] = true
   end
 end
 
--- Unified cache-safe name generator
+-- Unified cache-safe name generator (prefixed by suite)
 local function cachename(name)
   if name:sub(1, #SCRIPT_PREFIX) == SCRIPT_PREFIX then
     name = name:sub(#SCRIPT_PREFIX + 1)
   end
   name = name:gsub("/", "_")
   name = name:gsub("^_", "", 1)
-  return name
+  return SUITE .. "__" .. name
 end
 
 --------------------------------------------------
 -- Adaptive LRU Cache (in-memory loaders, interval-based eviction)
 --------------------------------------------------
-local LUA_RAM_THRESHOLD = 32 * 1024 -- 32 KB free (adjust as needed)
+local LUA_RAM_THRESHOLD = 32 * 1024 -- 32 KB free (bytes)
 local LRU_HARD_LIMIT = 50           -- absolute maximum (safety)
 local EVICT_INTERVAL = 5            -- seconds between eviction checks
 
@@ -170,7 +162,7 @@ function compile.wakeup()
       disk_cache[entry.cache_fname] = true
     end)
     compile._lastCompile = now
-    if ofs3 and ofs3.utils and log then
+    if ofs3 and ofs3.utils then
       if ok then
         ofs3.utils.log("Deferred-compiled (throttled): " .. entry.script, "info")
       else
@@ -180,11 +172,10 @@ function compile.wakeup()
   end
 end
 
+-- ENV-aware loadfile
 function compile.loadfile(script)
   local startTime
-  if logTimings then
-    startTime = os.clock()
-  end
+  if logTimings then startTime = os.clock() end
 
   local loader, which
   local cache_fname = cachename(script) .. "c"
@@ -195,16 +186,16 @@ function compile.loadfile(script)
     which = "in-memory"
   else
     if not ofs3.preferences.developer.compile then
-      loader = loadfile(script)
+      loader = loadfile_in_env(script)
       which = "raw"
     else
       local cache_path = compiledDir .. cache_fname
       if disk_cache[cache_fname] then
-        loader = loadfile(cache_path)
+        loader = loadfile_in_env(cache_path)
         which = "compiled"
       else
         compile._enqueue(script, cache_path, cache_fname)
-        loader = loadfile(script)
+        loader = loadfile_in_env(script)
         which = "raw (queued for deferred compile)"
       end
     end
@@ -226,23 +217,24 @@ function compile.dofile(script, ...)
 end
 
 function compile.require(modname)
-  if package.loaded[modname] then
-    return package.loaded[modname]
+  -- Suite-scoped module cache to avoid clashes across suites
+  local key = SUITE .. ":" .. modname
+  if package.loaded[key] then
+    return package.loaded[key]
   end
 
-  local raw_path = modname:gsub("%%.", "/") .. ".lua"
-  local path     = cachename(raw_path)
+  local raw_path = modname:gsub("%.", "/") .. ".lua"
   local chunk
 
   if not ofs3.preferences.developer.compile then
-    chunk = assert(loadfile(path))
+    chunk = assert(loadfile_in_env(raw_path))
   else
-    chunk = compile.loadfile(path)
+    chunk = compile.loadfile(raw_path)
   end
 
   local result = chunk()
-  package.loaded[modname] = (result == nil) and true or result
-  return package.loaded[modname]
+  package.loaded[key] = (result == nil) and true or result
+  return package.loaded[key]
 end
 
 return compile

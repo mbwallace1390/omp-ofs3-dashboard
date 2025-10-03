@@ -1,5 +1,10 @@
 {
   "sensors": {
+    "link": {
+      "english": "Link",
+      "translation": "Link",
+      "needs_translation": "false"
+    },
     "attpitch": {
       "english": "P.angle",
       "translation": "P.angle",
