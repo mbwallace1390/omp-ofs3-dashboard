@@ -129,7 +129,7 @@ local function openPage(pidx, title, script, displaymode)
 
     if #dates == 0 then
 
-        LCD_W, LCD_H = ofs3.utils.getWindowSize()
+        local LCD_W, LCD_H = ofs3.utils.getWindowSize()
         local str = "@i18n(app.modules.logs.msg_no_logs_found)@"
         local ew = LCD_W
         local eh = LCD_H
@@ -139,7 +139,7 @@ local function openPage(pidx, title, script, displaymode)
 
         local posErr = {w = etsizeW, h = ofs3.app.radio.navbuttonHeight, x = eposX, y = ePosY}
 
-        line = form.addLine("", nil, false)
+        local line = form.addLine("", nil, false)
         form.addStaticText(line, posErr, str)
 
     else

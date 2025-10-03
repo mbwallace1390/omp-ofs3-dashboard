@@ -1,6 +1,6 @@
 local settings = {}
 
-
+local enableWakeup = false
 local function sensorNameMap(sensorList)
     local nameMap = {}
     for _, sensor in ipairs(sensorList) do

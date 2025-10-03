@@ -5147,6 +5147,11 @@
         "needs_translation": "false",
         "translation": "Drehzahl"
       },
+      "link": {
+        "english": "Link",
+        "needs_translation": true,
+        "translation": "Link"
+      },
       "mcu_temp": {
         "english": "MCU Temperature",
         "needs_translation": "false",

@@ -2,6 +2,7 @@
 
 local themesBasePath = "SCRIPTS:/" .. ofs3.config.baseDir .. "/widgets/dashboard/themes/"
 local themesUserPath = "SCRIPTS:/" .. ofs3.config.preferences .. "/dashboard/"
+local enableWakeup = false
 
 local function openPage(pidx, title, script)
     -- Get the installed themes
