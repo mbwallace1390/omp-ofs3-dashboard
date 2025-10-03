@@ -1,10 +1,13 @@
 --[[
- * ofs3 - Deferred/Throttled Lua Script Compilation and Caching (ENV-aware)
+ * ofs3 - Deferred/Throttled Lua Script Compilation and Caching (ENV-aware, keyed by config.baseDir)
  * License GPLv3: https://www.gnu.org/licenses/gpl-3.0.en.html
 ]]
 
 local compile = {}
 local arg = {...}
+local config = arg[1] or {}
+-- Use the suite key passed from main.lua (ofs3.config.baseDir = "ofs3")
+local SUITE = (config and config.baseDir) or "suite"
 
 -- Capture the environment we were loaded with so all subsequent loads
 -- run with the same `_ENV` (which includes `ofs3` from main.lua).
@@ -18,7 +21,8 @@ local function loadfile_in_env(path)
     setfenv(chunk, ENV)
     return chunk
   else
-    return loadfile(path, "t", ENV)
+    -- nil mode: accept text/bytecode; run under ENV (more ETHOS-compatible)
+    return loadfile(path, nil, ENV)
   end
 end
 
@@ -33,38 +37,32 @@ if ofs3 and ofs3.config then
   end
 end
 
+-- Suite-specific compiled directory to avoid cross-suite clashes
 local baseDir     = "./"
-local compiledDir = baseDir .. "cache/"
+local compiledDir = baseDir .. "cache/" .. SUITE .. "/"
 local SCRIPT_PREFIX = "SCRIPTS:"
 
--- Ensure cache directory exists
-local function ensure_dir(dir)
-  if os.mkdir then
-    local found = false
-    for _, name in ipairs(system.listFiles(baseDir)) do
-      if name == "cache" then found = true; break end
-    end
-    if not found then os.mkdir(dir) end
-  end
-end
-ensure_dir(compiledDir)
+-- Ensure cache directories exist
+os.mkdir("cache")
+os.mkdir(compiledDir)
 
 -- On-disk compiled files index
 local disk_cache = {}
 do
-  for _, fname in ipairs(system.listFiles(compiledDir)) do
+  local list = system.listFiles and system.listFiles(compiledDir) or {}
+  for _, fname in ipairs(list) do
     disk_cache[fname] = true
   end
 end
 
--- Unified cache-safe name generator
+-- Unified cache-safe name generator (prefixed by suite)
 local function cachename(name)
   if name:sub(1, #SCRIPT_PREFIX) == SCRIPT_PREFIX then
     name = name:sub(#SCRIPT_PREFIX + 1)
   end
   name = name:gsub("/", "_")
   name = name:gsub("^_", "", 1)
-  return name
+  return SUITE .. "__" .. name
 end
 
 --------------------------------------------------
@@ -164,7 +162,7 @@ function compile.wakeup()
       disk_cache[entry.cache_fname] = true
     end)
     compile._lastCompile = now
-    if ofs3 and ofs3.utils and log then
+    if ofs3 and ofs3.utils then
       if ok then
         ofs3.utils.log("Deferred-compiled (throttled): " .. entry.script, "info")
       else
@@ -219,23 +217,24 @@ function compile.dofile(script, ...)
 end
 
 function compile.require(modname)
-  if package.loaded[modname] then
-    return package.loaded[modname]
+  -- Suite-scoped module cache to avoid clashes across suites
+  local key = SUITE .. ":" .. modname
+  if package.loaded[key] then
+    return package.loaded[key]
   end
 
-  local raw_path = modname:gsub("%%.", "/") .. ".lua"
-  local path     = cachename(raw_path)
+  local raw_path = modname:gsub("%.", "/") .. ".lua"
   local chunk
 
   if not ofs3.preferences.developer.compile then
-    chunk = assert(loadfile_in_env(path))
+    chunk = assert(loadfile_in_env(raw_path))
   else
-    chunk = compile.loadfile(path)
+    chunk = compile.loadfile(raw_path)
   end
 
   local result = chunk()
-  package.loaded[modname] = (result == nil) and true or result
-  return package.loaded[modname]
+  package.loaded[key] = (result == nil) and true or result
+  return package.loaded[key]
 end
 
 return compile
