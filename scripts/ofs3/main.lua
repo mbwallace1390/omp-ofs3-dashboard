@@ -9,10 +9,10 @@ ofs3.session = {}
 
 package.loaded.ofs3 = ofs3
 
--- If you still want to ban accidental globals in this chunk:
+-- Print warning if accidental globals:
 local _ENV = setmetatable({ ofs3 = ofs3 }, {
   __index = _G,
-  __newindex = function(_, k) error("attempt to create global '"..tostring(k).."'", 2) end
+  __newindex = function(_, k) print("attempt to create global '"..tostring(k).."'", 2) end
 })
 
 -- ETHOS font compatibility (1.6 vs 1.7)
