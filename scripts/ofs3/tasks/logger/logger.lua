@@ -1,3 +1,4 @@
+local ofs3 = require("ofs3")
 --[[
 
  * Copyright (C) ofs3 Project
@@ -43,7 +44,7 @@ local logger = {}
 os.mkdir("LOGS:")
 os.mkdir("LOGS:/ofs3")
 os.mkdir("LOGS:/ofs3/logs")
-logger.queue = assert(ofs3.compiler.loadfile("tasks/logger/lib/log.lua"))(config)
+logger.queue = assert(loadfile("tasks/logger/lib/log.lua"))(config)
 logger.queue.config.log_file = "LOGS:/ofs3/logs/ofs3_" .. os.date("%Y-%m-%d_%H-%M-%S") .. ".log"
 logger.queue.config.min_print_level  = ofs3.preferences.developer.loglevel
 logger.queue.config.log_to_file = tostring(ofs3.preferences.developer.logtofile)

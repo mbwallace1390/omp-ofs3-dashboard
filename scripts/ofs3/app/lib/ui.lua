@@ -1,3 +1,4 @@
+local ofs3 = require("ofs3")
 --[[
 
  * Copyright (C) ofs3 Project
@@ -961,7 +962,7 @@ local function getHelpData(section)
     local helpPath = "app/modules/" .. section .. "/help.lua"
     if ofs3.utils.file_exists(helpPath) then
       local ok, helpData = pcall(function()
-        return assert(ofs3.compiler.loadfile(helpPath))()
+        return assert(loadfile(helpPath))()
       end)
       ui._helpCache[section] = (ok and type(helpData)=="table") and helpData or false
     else
@@ -1005,14 +1006,14 @@ function ui.openPage(idx, title, script, extra1, extra2, extra3, extra5, extra6)
     -- Load the module
     local modulePath = "app/modules/" .. script
 
-    ofs3.app.Page = assert(ofs3.compiler.loadfile(modulePath))(idx)
+    ofs3.app.Page = assert(loadfile(modulePath))(idx)
 
     -- Load the help file if it exists
     local section = script:match("([^/]+)")
     local helpData = getHelpData(section)
     ofs3.app.fieldHelpTxt = helpData and helpData.fields or nil
 
-   -- ofs3.app.Page = assert(ofs3.compiler.loadfile(modulePath))(idx)
+   -- ofs3.app.Page = assert(loadfile(modulePath))(idx)
     -- If the Page has its own openPage function, use it and return early
     if ofs3.app.Page.openPage then
         ofs3.app.Page.openPage(idx, title, script, extra1, extra2, extra3, extra5, extra6)
@@ -1094,7 +1095,7 @@ function ui.openPageDashboard(idx, title, script, source, folder)
     -- Load the module
     local modulePath =  script
 
-    ofs3.app.Page = assert(ofs3.compiler.loadfile(modulePath))(idx)
+    ofs3.app.Page = assert(loadfile(modulePath))(idx)
 
     -- load up the menu
     local w, h = ofs3.utils.getWindowSize()

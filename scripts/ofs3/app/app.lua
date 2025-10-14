@@ -1,3 +1,4 @@
+local ofs3 = require("ofs3")
 --[[
 
  * Copyright (C) ofs3 Project
@@ -22,7 +23,7 @@ local app = {}
 
 local utils = ofs3.utils
 local log = utils.log
-local compile = ofs3.compiler.loadfile
+local compile = loadfile
 
 local arg = {...}
 
@@ -449,22 +450,22 @@ function app.create()
     app.dialogs.badversion = false
     app.dialogs.badversionDisplay = false
 
-    app.ui = assert(compile("app/lib/ui.lua"))(config)
+    app.ui = assert(loadfile("app/lib/ui.lua"))(config)
 
     -- ofs3.session.apiVersion = nil
     config.environment = system.getVersion()
     config.ethosRunningVersion = {config.environment.major, config.environment.minor, config.environment.revision}
 
     ofs3.session.lcdWidth, ofs3.session.lcdHeight = utils.getWindowSize()
-    app.radio = assert(compile("app/radios.lua"))()
+    app.radio = assert(loadfile("app/radios.lua"))()
 
     app.uiState = app.uiStatus.init
 
-    app.MainMenu  = assert(compile("app/modules/init.lua"))()
+    app.MainMenu  = assert(loadfile("app/modules/init.lua"))()
 
-    app.ui = assert(compile("app/lib/ui.lua"))(config)
+    app.ui = assert(loadfile("app/lib/ui.lua"))(config)
 
-    app.utils = assert(compile("app/lib/utils.lua"))(config)
+    app.utils = assert(loadfile("app/lib/utils.lua"))(config)
 
 
     app.initialized = true

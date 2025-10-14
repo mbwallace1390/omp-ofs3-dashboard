@@ -1,3 +1,4 @@
+local ofs3 = require("ofs3")
 --[[ 
     PID/Rates Profile Display Object
 

@@ -1,3 +1,4 @@
+local ofs3 = require("ofs3")
 --[[
  * ofs3 - Deferred/Throttled Lua Script Compilation and Caching (ENV-aware, keyed by config.baseDir)
  * License GPLv3: https://www.gnu.org/licenses/gpl-3.0.en.html

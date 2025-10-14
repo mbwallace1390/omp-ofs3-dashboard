@@ -1,3 +1,4 @@
+local ofs3 = require("ofs3")
 --[[ 
  * Copyright (C) ofs3 Project
  *

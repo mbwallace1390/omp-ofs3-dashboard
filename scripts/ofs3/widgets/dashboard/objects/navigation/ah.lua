@@ -1,3 +1,4 @@
+local ofs3 = require("ofs3")
 --[[
     Attitude Horizon Widget (AH)
     Configurable Parameters (box table fields):

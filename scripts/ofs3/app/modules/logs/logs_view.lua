@@ -1,5 +1,6 @@
+local ofs3 = require("ofs3")
 -- display vars
-local utils = assert(ofs3.compiler.loadfile("SCRIPTS:/" .. ofs3.config.baseDir .. "/app/modules/logs/lib/utils.lua"))()
+local utils = assert(loadfile("SCRIPTS:/" .. ofs3.config.baseDir .. "/app/modules/logs/lib/utils.lua"))()
 local res = system.getVersion()
 local LCD_W = res.lcdWidth
 local LCD_H = res.lcdHeight

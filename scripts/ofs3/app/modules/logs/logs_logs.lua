@@ -1,4 +1,5 @@
-local utils = assert(ofs3.compiler.loadfile("SCRIPTS:/" .. ofs3.config.baseDir .. "/app/modules/logs/lib/utils.lua"))()
+local ofs3 = require("ofs3")
+local utils = assert(loadfile("SCRIPTS:/" .. ofs3.config.baseDir .. "/app/modules/logs/lib/utils.lua"))()
 
 local triggerOverRide = false
 local triggerOverRideAll = false
