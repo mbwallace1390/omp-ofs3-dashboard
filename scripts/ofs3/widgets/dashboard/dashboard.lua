@@ -1,3 +1,4 @@
+local ofs3 = require("ofs3")
 --[[
  * Copyright (C) Rotorflight Project
  *
@@ -19,7 +20,7 @@
 local dashboard = {}  -- main namespace for all dashboard functionality
 
 -- cache some functions and variables for performance
-local compile = ofs3.compiler.loadfile
+local compile = loadfile
 
 local baseDir = ofs3.config.baseDir
 local preferences = ofs3.config.preferences
@@ -315,7 +316,7 @@ function dashboard.loadObjectType(box)
         local objPath = "SCRIPTS:/" .. bdir .. "/widgets/dashboard/objects/" .. typ .. ".lua"
 
         local ok, obj = pcall(function()
-            return assert(compile(objPath))()
+            return assert(loadfile(objPath))()
         end)
         if ok and type(obj) == "table" then
             dashboard._moduleCache[typ] = obj
@@ -345,7 +346,7 @@ function dashboard.loadAllObjects(boxConfigs)
                 local bdir = baseDir or "default"
                 local objPath = "SCRIPTS:/" .. bdir .. "/widgets/dashboard/objects/" .. typ .. ".lua"
                 local ok, obj = pcall(function()
-                    return assert(compile(objPath))()
+                    return assert(loadfile(objPath))()
                 end)
                 if ok and type(obj) == "table" then
                     dashboard._moduleCache[typ] = obj
@@ -1173,10 +1174,10 @@ end
 function dashboard.create()
     -- 1) one-time (per Lua VM) helper modules; don’t recompile per instance
     if not dashboard.utils then
-        dashboard.utils = assert(compile("SCRIPTS:/" .. ofs3.config.baseDir .. "/widgets/dashboard/lib/utils.lua"))()
+        dashboard.utils = assert(loadfile("SCRIPTS:/" .. ofs3.config.baseDir .. "/widgets/dashboard/lib/utils.lua"))()
     end
     if not dashboard.loaders then
-        dashboard.loaders = assert(compile("SCRIPTS:/" .. ofs3.config.baseDir .. "/widgets/dashboard/lib/loaders.lua"))()
+        dashboard.loaders = assert(loadfile("SCRIPTS:/" .. ofs3.config.baseDir .. "/widgets/dashboard/lib/loaders.lua"))()
     end
 
     -- 2) ensure user theme dir exists

@@ -1,3 +1,4 @@
+local ofs3 = require("ofs3")
 --[[
 
  * Copyright (C) OFS3 Project
@@ -45,7 +46,7 @@
 
 -- keep these constant / cheap definitions at file scope
 local utils = ofs3.utils
-local compiler = ofs3.compiler.loadfile
+local compiler = loadfile
 
 local currentTelemetrySensor
 local tasksPerCycle
@@ -174,7 +175,7 @@ end
 function tasks.initialize()
     local cacheFile, cachePath = "tasks.lua", "cache/tasks.lua"
     if io.open(cachePath, "r") then
-        local ok, cached = pcall(ofs3.compiler.dofile, cachePath)
+        local ok, cached = pcall(dofile, cachePath)
         if ok and type(cached) == "table" then
             tasks._initMetadata = cached
             utils.log("[cache] Loaded task metadata from cache", "info")

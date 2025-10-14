@@ -1,3 +1,4 @@
+local ofs3 = require("ofs3")
 local utils = {}
 
 --- Resolves model name from telemetry folder's configuration file

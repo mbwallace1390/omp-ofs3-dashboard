@@ -1,3 +1,4 @@
+local ofs3 = require("ofs3")
 
 
 local themesBasePath = "SCRIPTS:/" .. ofs3.config.baseDir .. "/widgets/dashboard/themes/"

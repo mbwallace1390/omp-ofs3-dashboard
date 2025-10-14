@@ -1,3 +1,4 @@
+local ofs3 = require("ofs3")
 local ini = {}
 
 -- Reads a file's full contents into a string, compatible with limited Lua

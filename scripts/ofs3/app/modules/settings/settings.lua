@@ -1,3 +1,4 @@
+local ofs3 = require("ofs3")
 
 
 local S_PAGES = {
@@ -93,7 +94,7 @@ local function openPage(pidx, title, script)
     if ofs3.preferences.menulastselected["settings"] == nil then ofs3.preferences.menulastselected["settings"] = 1 end
 
 
-    local Menu = assert(ofs3.compiler.loadfile("app/modules/" .. script))()
+    local Menu = assert(loadfile("app/modules/" .. script))()
     local pages = S_PAGES
     local lc = 0
     local bx = 0

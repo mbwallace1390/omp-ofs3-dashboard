@@ -1,3 +1,4 @@
+local ofs3 = require("ofs3")
 local wrapper = {}
 
 local renders = ofs3.widgets.dashboard.renders
@@ -40,7 +41,7 @@ function wrapper.wakeup(box)
 
     if not renders[subtype] then
         local path = folder .. subtype .. ".lua"
-        local loader = ofs3.compiler.loadfile(path)
+        local loader = loadfile(path)
         if loader then
             renders[subtype] = loader()
         else

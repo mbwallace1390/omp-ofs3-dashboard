@@ -1,3 +1,4 @@
+local ofs3 = require("ofs3")
 --[[
 
  * Copyright (C) ofs3 Project
@@ -29,7 +30,7 @@ local delayDuration = 2  -- seconds
 local delayStartTime = nil
 local delayPending = false
 
-local smart = assert(ofs3.compiler.loadfile("tasks/sensors/smart.lua"))(config)
+local smart = assert(loadfile("tasks/sensors/smart.lua"))(config)
 
 local log = ofs3.utils.log
 local tasks = ofs3.tasks
@@ -55,7 +56,7 @@ local function loadSensorModule()
     if system:getVersion().simulation == true then
         if not loadedSensorModule or loadedSensorModule.name ~= "sim" then
             --log("Loading Simulator sensor module","info")
-            loadedSensorModule = {name = "sim", module = assert(ofs3.compiler.loadfile("tasks/sensors/sim.lua"))(config)}
+            loadedSensorModule = {name = "sim", module = assert(loadfile("tasks/sensors/sim.lua"))(config)}
         end   
     else
         loadedSensorModule = nil  -- No matching sensor, clear to save memory

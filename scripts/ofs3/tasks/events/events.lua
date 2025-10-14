@@ -1,3 +1,4 @@
+local ofs3 = require("ofs3")
 --[[
  * Copyright (C) ofs3 Project
  *
@@ -28,7 +29,7 @@ local taskExecutionPercent = 50 -- 50% of tasks will run each cycle
 
 -- Dynamically load task modules and populate wakeupHandlers
 for _, name in ipairs(taskNames) do
-    events[name] = assert(ofs3.compiler.loadfile("tasks/events/tasks/" .. name .. ".lua"))(ofs3.config)
+    events[name] = assert(loadfile("tasks/events/tasks/" .. name .. ".lua"))(ofs3.config)
     table.insert(wakeupHandlers, function() events[name].wakeup() end)
 end
 

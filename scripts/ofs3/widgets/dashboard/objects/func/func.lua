@@ -1,3 +1,4 @@
+local ofs3 = require("ofs3")
 --[[
     Custom Function Widget
     Configurable Arguments (box table keys):

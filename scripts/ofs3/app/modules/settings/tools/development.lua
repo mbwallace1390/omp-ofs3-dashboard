@@ -1,3 +1,4 @@
+local ofs3 = require("ofs3")
 local settings = {}
 local enableWakeup = false
 
@@ -34,23 +35,6 @@ formFieldCount = formFieldCount + 1
                                                                 settings.devtools = newValue
                                                             end    
                                                         end)    
-
-
-    formFieldCount = formFieldCount + 1
-    ofs3.session.formLineCnt = ofs3.session.formLineCnt + 1
-    ofs3.app.formLines[ofs3.session.formLineCnt] = form.addLine("@i18n(app.modules.settings.txt_compilation)@")
-    ofs3.app.formFields[formFieldCount] = form.addBooleanField(ofs3.app.formLines[ofs3.session.formLineCnt], 
-                                                        nil, 
-                                                        function() 
-                                                            if ofs3.preferences and ofs3.preferences.developer then
-                                                                return settings['compile'] 
-                                                            end
-                                                        end, 
-                                                        function(newValue) 
-                                                            if ofs3.preferences and ofs3.preferences.developer then
-                                                                settings.compile = newValue
-                                                            end    
-                                                        end)                                                        
 
 
 

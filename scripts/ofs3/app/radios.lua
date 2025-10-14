@@ -1,3 +1,4 @@
+local ofs3 = require("ofs3")
 local LCD_W, LCD_H = ofs3.utils.getWindowSize()
 local resolution = LCD_W .. "x" .. LCD_H
 

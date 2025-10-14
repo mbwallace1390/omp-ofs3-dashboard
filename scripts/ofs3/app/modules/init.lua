@@ -1,3 +1,4 @@
+local ofs3 = require("ofs3")
 --[[
 
  * Copyright (C) ofs3 Project
@@ -19,7 +20,7 @@
 
 ]] --
 local pages = {}
-local sections = ofs3.compiler.loadfile("app/modules/sections.lua")()
+local sections = loadfile("app/modules/sections.lua")()
 
 -- find the modules (this should already have been done in the tasks/tasks.lua script but we catch and retry on the offchance it hasn't)
 if ofs3.app.moduleList == nil then ofs3.app.moduleList = ofs3.utils.findModules() end

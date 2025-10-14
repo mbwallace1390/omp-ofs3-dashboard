@@ -1,3 +1,4 @@
+local ofs3 = require("ofs3")
 --[[
  * Copyright (C) Rotorflight Project
  * License GPLv3: https://www.gnu.org/licenses/gpl-3.0.en.html
@@ -39,7 +40,7 @@ function tasks.findTasks()
             if file:match("%.lua$") then
                 local fullPath = dirPath .. file
                 local name = level .. "/" .. file:gsub("%.lua$", "")
-                local chunk, err = ofs3.compiler.loadfile(fullPath)
+                local chunk, err = loadfile(fullPath)
                 if not chunk then
                     ofs3.utils.log("Error loading task " .. fullPath .. ": " .. err, "error")
                 else

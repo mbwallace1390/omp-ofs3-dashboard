@@ -1,3 +1,4 @@
+local ofs3 = require("ofs3")
 --[[
     Total Flight Time Widget
     Configurable Parameters (box table fields):

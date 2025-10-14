@@ -1,3 +1,4 @@
+local ofs3 = require("ofs3")
 --[[
     Step Bar Widget
     Configurable Parameters (box table fields):

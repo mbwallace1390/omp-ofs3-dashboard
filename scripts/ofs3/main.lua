@@ -1,3 +1,4 @@
+
 --[[
  * ofs3 - Main (ENV-scoped, no globals), compatibility-focused
 ]]
@@ -6,11 +7,12 @@
 local ofs3 = {}
 ofs3.session = {}
 
--- Shared env so modules see `ofs3` without polluting _G
-local ENV = setmetatable({ ofs3 = ofs3 }, {
+package.loaded.ofs3 = ofs3
+
+-- If you still want to ban accidental globals in this chunk:
+local _ENV = setmetatable({ ofs3 = ofs3 }, {
   __index = _G,
-  -- Uncomment to guard accidental globals in modules:
-   __newindex = function(_, k) error("attempt to create global '"..tostring(k).."'", 2) end
+  __newindex = function(_, k) error("attempt to create global '"..tostring(k).."'", 2) end
 })
 
 -- ETHOS font compatibility (1.6 vs 1.7)
@@ -33,7 +35,7 @@ local config = {
 ofs3.config = config
 
 -- INI utilities (no need to pass args)
-ofs3.ini = assert(loadfile("lib/ini.lua", nil, ENV))()
+ofs3.ini = assert(loadfile("lib/ini.lua", nil, _ENV))()
 
 -- Defaults
 local userpref_defaults = {
@@ -66,13 +68,10 @@ end
 ofs3.config.bgTaskName = ofs3.config.toolName .. " [Background]"
 ofs3.config.bgTaskKey = "ofs3bg"
 
--- Compiler (loaded in ENV; takes no args)
-ofs3.compiler = assert(loadfile("lib/compile.lua", nil, ENV))()
-
 -- Core libs/apps (pass config as first arg as expected by these modules)
-ofs3.utils = assert(ofs3.compiler.loadfile("lib/utils.lua"))(ofs3.config)
-ofs3.app   = assert(ofs3.compiler.loadfile("app/app.lua"))(ofs3.config)
-ofs3.tasks = assert(ofs3.compiler.loadfile("tasks/tasks.lua"))(ofs3.config)
+ofs3.utils = assert(loadfile("lib/utils.lua"))(ofs3.config)
+ofs3.app   = assert(loadfile("app/app.lua"))(ofs3.config)
+ofs3.tasks = assert(loadfile("tasks/tasks.lua"))(ofs3.config)
 
 -- Flight mode & session
 ofs3.flightmode = { current = "preflight" }
@@ -132,7 +131,7 @@ local function register_bg_task()
 end
 
 local function load_widget_cache(cachePath)
-  local loadf = ofs3.compiler.loadfile(cachePath)
+  local loadf = loadfile(cachePath)
   if not loadf then return nil end
   local ok, cached = pcall(loadf)
   if ok and type(cached) == "table" then
@@ -153,7 +152,7 @@ local function register_widgets(widgetList)
   for _, v in ipairs(widgetList) do
     if v.script then
       local path = "widgets/" .. v.folder .. "/" .. v.script
-      local scriptModule = assert(ofs3.compiler.loadfile(path))(ofs3.config)
+      local scriptModule = assert(loadfile(path))(ofs3.config)
 
       local base = v.varname or v.script:gsub("%.lua$", "")
       if ofs3.widgets[base] then

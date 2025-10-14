@@ -1,3 +1,4 @@
+local ofs3 = require("ofs3")
 --[[
 
  * Copyright (C) ofs3 Project
@@ -58,7 +59,7 @@
 
 local smart = {}
 
-local smartfuel = assert(ofs3.compiler.loadfile("tasks/sensors/lib/smartfuel.lua"))()
+local smartfuel = assert(loadfile("tasks/sensors/lib/smartfuel.lua"))()
 
 -- container vars
 local log

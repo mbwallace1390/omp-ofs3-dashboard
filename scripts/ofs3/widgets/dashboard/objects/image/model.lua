@@ -1,3 +1,4 @@
+local ofs3 = require("ofs3")
 --[[
     Model Image Widget
     Configurable Parameters (box table fields):
