@@ -1,11 +1,9 @@
-local ofs3 = require("ofs3")
 --[[
- * Copyright (C) Rotorflight Project
- * License GPLv3: https://www.gnu.org/licenses/gpl-3.0.en.html
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 3 as
- * published by the Free Software Foundation.
---]]
+  Copyright (C) 2025 Rob Thomson
+  GPLv3 — https://www.gnu.org/licenses/gpl-3.0.en.html
+]] --
+
+local ofs3 = require("ofs3")
 
 local tasks = {}
 local tasksList = {}
@@ -13,21 +11,16 @@ local tasksLoaded = false
 
 local TASK_TIMEOUT_SECONDS = 10
 
--- Base path and priority levels
 local BASE_PATH = "tasks/onconnect/tasks/"
 local PRIORITY_LEVELS = {"high", "medium", "low"}
 
--- Initialize or reset session flags
 local function resetSessionFlags()
     ofs3.session.onConnect = ofs3.session.onConnect or {}
-    for _, level in ipairs(PRIORITY_LEVELS) do
-        ofs3.session.onConnect[level] = false
-    end
-    -- Ensure isConnected resets until high priority completes
+    for _, level in ipairs(PRIORITY_LEVELS) do ofs3.session.onConnect[level] = false end
+
     ofs3.session.isConnected = false
 end
 
--- Discover task files in fixed priority order
 function tasks.findTasks()
     if tasksLoaded then return end
 
@@ -46,13 +39,7 @@ function tasks.findTasks()
                 else
                     local module = assert(chunk())
                     if type(module) == "table" and type(module.wakeup) == "function" then
-                        tasksList[name] = {
-                            module = module,
-                            priority = level,
-                            initialized = false,
-                            complete = false,
-                            startTime = nil
-                        }
+                        tasksList[name] = {module = module, priority = level, initialized = false, complete = false, startTime = nil}
                     else
                         ofs3.utils.log("Invalid task file: " .. fullPath, "info")
                     end
@@ -82,7 +69,7 @@ function tasks.wakeup()
 
     if ofs3.session.telemetryTypeChanged then
         ofs3.utils.logRotorFlightBanner()
-        --ofs3.utils.log("Telemetry type changed, resetting tasks.", "info")
+
         ofs3.session.telemetryTypeChanged = false
         tasks.resetAllTasks()
         tasksLoaded = false
@@ -95,13 +82,10 @@ function tasks.wakeup()
         return
     end
 
-    if not tasksLoaded then
-        tasks.findTasks()
-    end
+    if not tasksLoaded then tasks.findTasks() end
 
     local now = os.clock()
 
-    -- Run each task
     for name, task in pairs(tasksList) do
         if not task.initialized then
             task.initialized = true
@@ -121,7 +105,6 @@ function tasks.wakeup()
         end
     end
 
-    -- Update session flags as soon as each priority level completes
     for _, level in ipairs(PRIORITY_LEVELS) do
         if not ofs3.session.onConnect[level] then
             local levelDone = true
@@ -135,7 +118,6 @@ function tasks.wakeup()
                 ofs3.session.onConnect[level] = true
                 ofs3.utils.log("All '" .. level .. "' tasks complete.", "info")
 
-                -- Signal the session connected immediately when high priority finishes
                 if level == "high" then
                     ofs3.utils.playFileCommon("beep.wav")
                     ofs3.flightmode.current = "preflight"
@@ -145,9 +127,9 @@ function tasks.wakeup()
                 elseif level == "medium" then
                     ofs3.session.isConnectedMedium = true
                     return
-                elseif level == "low" then 
-                    ofs3.session.isConnectedLow = true    
-                    ofs3.session.isConnected = true  
+                elseif level == "low" then
+                    ofs3.session.isConnectedLow = true
+                    ofs3.session.isConnected = true
                     collectgarbage()
                     return
                 end

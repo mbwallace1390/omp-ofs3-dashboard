@@ -1,15 +1,13 @@
+--[[
+  Copyright (C) 2025 Rob Thomson
+  GPLv3 — https://www.gnu.org/licenses/gpl-3.0.en.html
+]] --
+
 local ofs3 = require("ofs3")
 
-
-
-local S_PAGES = {
-    {name = "@i18n(app.modules.settings.dashboard_theme)@", script = "dashboard_theme.lua", image = "dashboard_theme.png"},
-    {name = "@i18n(app.modules.settings.dashboard_settings)@", script = "dashboard_settings.lua", image = "dashboard_settings.png"},
-}
+local S_PAGES = {{name = "@i18n(app.modules.settings.dashboard_theme)@", script = "dashboard_theme.lua", image = "dashboard_theme.png"}, {name = "@i18n(app.modules.settings.dashboard_settings)@", script = "dashboard_settings.lua", image = "dashboard_settings.png"}}
 
 local function openPage(pidx, title, script)
-
-
 
     ofs3.app.triggers.isReady = false
     ofs3.app.uiState = ofs3.app.uiStatus.mainMenu
@@ -20,8 +18,6 @@ local function openPage(pidx, title, script)
     ofs3.app.lastTitle = title
     ofs3.app.lastScript = script
 
-
-    -- size of buttons
     if ofs3.preferences.general.iconsize == nil or ofs3.preferences.general.iconsize == "" then
         ofs3.preferences.general.iconsize = 1
     else
@@ -36,29 +32,23 @@ local function openPage(pidx, title, script)
     local sc
     local panel
 
-
     local buttonW = 100
     local x = windowWidth - buttonW - 10
 
-    ofs3.app.ui.fieldHeader(
-        "@i18n(app.modules.settings.name)@" .. " / " .. "@i18n(app.modules.settings.dashboard)@"
-    )
-
+    ofs3.app.ui.fieldHeader("@i18n(app.modules.settings.name)@" .. " / " .. "@i18n(app.modules.settings.dashboard)@")
 
     local buttonW
     local buttonH
     local padding
     local numPerRow
 
-    -- TEXT ICONS
-    -- TEXT ICONS
     if ofs3.preferences.general.iconsize == 0 then
         padding = ofs3.app.radio.buttonPaddingSmall
         buttonW = (ofs3.session.lcdWidth - padding) / ofs3.app.radio.buttonsPerRow - padding
         buttonH = ofs3.app.radio.navbuttonHeight
         numPerRow = ofs3.app.radio.buttonsPerRow
     end
-    -- SMALL ICONS
+
     if ofs3.preferences.general.iconsize == 1 then
 
         padding = ofs3.app.radio.buttonPaddingSmall
@@ -66,7 +56,7 @@ local function openPage(pidx, title, script)
         buttonH = ofs3.app.radio.buttonHeightSmall
         numPerRow = ofs3.app.radio.buttonsPerRowSmall
     end
-    -- LARGE ICONS
+
     if ofs3.preferences.general.iconsize == 2 then
 
         padding = ofs3.app.radio.buttonPadding
@@ -75,18 +65,14 @@ local function openPage(pidx, title, script)
         numPerRow = ofs3.app.radio.buttonsPerRow
     end
 
-
     if ofs3.app.gfx_buttons["settings_dashboard"] == nil then ofs3.app.gfx_buttons["settings_dashboard"] = {} end
     if ofs3.preferences.menulastselected["settings_dashboard"] == nil then ofs3.preferences.menulastselected["settings_dashboard"] = 1 end
-
 
     local Menu = assert(loadfile("app/modules/" .. script))()
     local pages = S_PAGES
     local lc = 0
     local bx = 0
     local y = 0
-
-
 
     for pidx, pvalue in ipairs(S_PAGES) do
 
@@ -108,8 +94,7 @@ local function openPage(pidx, title, script)
             text = pvalue.name,
             icon = ofs3.app.gfx_buttons["settings_dashboard"][pidx],
             options = FONT_S,
-            paint = function()
-            end,
+            paint = function() end,
             press = function()
                 ofs3.preferences.menulastselected["settings_dashboard"] = pidx
                 ofs3.app.ui.progressDisplay()
@@ -133,41 +118,19 @@ local function openPage(pidx, title, script)
 end
 
 local function event(widget, category, value, x, y)
-    -- if close event detected go to section home page
+
     if category == EVT_CLOSE and value == 0 or value == 35 then
-        ofs3.app.ui.openPage(
-            pageIdx,
-            "@i18n(app.modules.settings.name)@",
-            "settings/settings.lua"
-        )
+        ofs3.app.ui.openPage(pageIdx, "@i18n(app.modules.settings.name)@", "settings/settings.lua")
         return true
     end
 end
 
-
 local function onNavMenu()
     ofs3.app.ui.progressDisplay()
-        ofs3.app.ui.openPage(
-            pageIdx,
-            "@i18n(app.modules.settings.name)@",
-            "settings/settings.lua"
-        )
-        return true
+    ofs3.app.ui.openPage(pageIdx, "@i18n(app.modules.settings.name)@", "settings/settings.lua")
+    return true
 end
 
 ofs3.app.uiState = ofs3.app.uiStatus.pages
 
-return {
-    pages = pages, 
-    openPage = openPage,
-    onNavMenu = onNavMenu,
-    event = event,
-    API = {},
-        navButtons = {
-        menu   = true,
-        save   = false,
-        reload = false,
-        tool   = false,
-        help   = false,
-    },    
-}
+return {pages = pages, openPage = openPage, onNavMenu = onNavMenu, event = event, API = {}, navButtons = {menu = true, save = false, reload = false, tool = false, help = false}}

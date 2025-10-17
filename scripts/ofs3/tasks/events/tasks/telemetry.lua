@@ -1,29 +1,18 @@
-local ofs3 = require("ofs3")
 --[[
- * Copyright (C) ofs3 Project
- *
- * License GPLv3: https://www.gnu.org/licenses/gpl-3.0.en.html
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 3 as
- * published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU General Public License for more details.
- *
- * Note: Some icons have been sourced from https://www.flaticon.com/
-]]--
+  Copyright (C) 2025 Rob Thomson
+  GPLv3 — https://www.gnu.org/licenses/gpl-3.0.en.html
+]] --
 
-local arg = { ... }
+local ofs3 = require("ofs3")
+
+local arg = {...}
 local config = arg[1]
 
 local telemetry = {}
 
 local lastEventTimes = {}
-local lastValues     = {}
-local lastPlayTime   = {}
+local lastValues = {}
+local lastPlayTime = {}
 
 local userpref = ofs3.preferences
 local enabledEvents = (userpref and userpref.events) or {}
@@ -35,14 +24,14 @@ local eventTable = {
             local session = ofs3.session
             if not session.batteryConfig then return end
 
-            local cellCount   = session.batteryConfig.batteryCellCount
+            local cellCount = session.batteryConfig.batteryCellCount
             local warnVoltage = session.batteryConfig.vbatwarningcellvoltage
-            local minVoltage  = session.batteryConfig.vbatmincellvoltage
+            local minVoltage = session.batteryConfig.vbatmincellvoltage
 
             local collective = session.rx.values['collective'] or 0
-            local aileron    = session.rx.values['aileron'] or 0
-            local elevator   = session.rx.values['elevator'] or 0
-            local rudder     = session.rx.values['rudder'] or 0
+            local aileron = session.rx.values['aileron'] or 0
+            local elevator = session.rx.values['elevator'] or 0
+            local rudder = session.rx.values['rudder'] or 0
 
             if not (cellCount and warnVoltage and minVoltage) then return end
 
@@ -52,49 +41,24 @@ local eventTable = {
             local suppressionPercent = userpref.general.gimbalsupression or 0.85
             local suppressionLimit = suppressionPercent * 1024
 
-            --if math.abs(collective) > suppressionLimit or
-            --   math.abs(aileron) > suppressionLimit or
-            --   math.abs(elevator) > suppressionLimit or
-            --   math.abs(rudder) > suppressionLimit then
-            --    return
-            --end
-
-            if cellVoltage < warnVoltage then
-                ofs3.utils.playFile("events", "alerts/lowvoltage.wav")
-            end
+            if cellVoltage < warnVoltage then ofs3.utils.playFile("events", "alerts/lowvoltage.wav") end
         end,
         interval = 10
-    },
-    {
-        sensor = "smartfuel",
-        event = function(value)
-            -- Play the alert every interval if fuel is 10% or below
-            if value and value <= 10 then
-                ofs3.utils.playFile("events", "alerts/lowfuel.wav")
-            end
-        end,
-        interval = 10
-    },
-    {
+    }, {sensor = "smartfuel", event = function(value) if value and value <= 10 then ofs3.utils.playFile("events", "alerts/lowfuel.wav") end end, interval = 10}, {
         sensor = "profile",
         event = function(value)
             ofs3.utils.playFile("events", "alerts/profile.wav")
             system.playNumber(math.floor(value))
         end,
         debounce = 0.25
-    },
-    {
+    }, {
         sensor = "armed",
         event = function(value)
-            if value == 0 then
-                ofs3.utils.playFile("events", "alerts/armed.wav")
-            end    
-            if value == 1 then
-                ofs3.utils.playFile("events", "alerts/disarmed.wav")
-            end   
+            if value == 0 then ofs3.utils.playFile("events", "alerts/armed.wav") end
+            if value == 1 then ofs3.utils.playFile("events", "alerts/disarmed.wav") end
         end,
         debounce = 0.25
-    },    
+    }
 }
 
 function telemetry.wakeup()

@@ -1,3 +1,8 @@
+--[[
+  Copyright (C) 2025 Rob Thomson
+  GPLv3 — https://www.gnu.org/licenses/gpl-3.0.en.html
+]] --
+
 local ofs3 = require("ofs3")
 local utils = assert(loadfile("SCRIPTS:/" .. ofs3.config.baseDir .. "/app/modules/logs/lib/utils.lua"))()
 
@@ -15,35 +20,23 @@ local function getCleanModelName()
     return logdir
 end
 
-
 local function extractHourMinute(filename)
-    -- Capture hour and minute from the time-portion (HH-MM-SS) after the underscore
+
     local hour, minute = filename:match(".-%d%d%d%d%-%d%d%-%d%d_(%d%d)%-(%d%d)%-%d%d")
-    if hour and minute then
-        return hour .. ":" .. minute
-    end
+    if hour and minute then return hour .. ":" .. minute end
     return nil
 end
 
 local function format_date(iso_date)
-  local y, m, d = iso_date:match("^(%d+)%-(%d+)%-(%d+)$")
-  return os.date("%d %B %Y", os.time{
-    year  = tonumber(y),
-    month = tonumber(m),
-    day   = tonumber(d),
-  })
+    local y, m, d = iso_date:match("^(%d+)%-(%d+)%-(%d+)$")
+    return os.date("%d %B %Y", os.time {year = tonumber(y), month = tonumber(m), day = tonumber(d)})
 end
 
 local function openPage(pidx, title, script, displaymode)
 
-    -- hard exit on error
-    if not ofs3.utils.ethosVersionAtLeast() then
-        return
-    end
-
+    if not ofs3.utils.ethosVersionAtLeast() then return end
 
     currentDisplayMode = displaymode
-
 
     ofs3.app.triggers.isReady = false
     ofs3.app.uiState = ofs3.app.uiStatus.pages
@@ -62,28 +55,27 @@ local function openPage(pidx, title, script, displaymode)
     local sc
     local panel
 
-     local logDir = utils.getLogPath()
+    local logDir = utils.getLogPath()
 
-    local logs = utils.getLogs(logDir)   
+    local logs = utils.getLogs(logDir)
 
     print(logDir)
 
-
     local name = utils.resolveModelName(ofs3.session.mcu_id or ofs3.session.activeLogDir)
-    ofs3.app.ui.fieldHeader("Logs" )
+    ofs3.app.ui.fieldHeader("Logs")
 
     local buttonW
     local buttonH
     local padding
     local numPerRow
 
-   if ofs3.preferences.general.iconsize == 0 then
+    if ofs3.preferences.general.iconsize == 0 then
         padding = ofs3.app.radio.buttonPaddingSmall
         buttonW = (ofs3.session.lcdWidth - padding) / ofs3.app.radio.buttonsPerRow - padding
         buttonH = ofs3.app.radio.navbuttonHeight
         numPerRow = ofs3.app.radio.buttonsPerRow
     end
-    -- SMALL ICONS
+
     if ofs3.preferences.general.iconsize == 1 then
 
         padding = ofs3.app.radio.buttonPaddingSmall
@@ -91,7 +83,7 @@ local function openPage(pidx, title, script, displaymode)
         buttonH = ofs3.app.radio.buttonHeightSmall
         numPerRow = ofs3.app.radio.buttonsPerRowSmall
     end
-    -- LARGE ICONS
+
     if ofs3.preferences.general.iconsize == 2 then
 
         padding = ofs3.app.radio.buttonPadding
@@ -99,7 +91,6 @@ local function openPage(pidx, title, script, displaymode)
         buttonH = ofs3.app.radio.buttonHeight
         numPerRow = ofs3.app.radio.buttonsPerRow
     end
-
 
     local x = windowWidth - buttonW + 10
 
@@ -112,7 +103,6 @@ local function openPage(pidx, title, script, displaymode)
     if ofs3.app.gfx_buttons["logs"] == nil then ofs3.app.gfx_buttons["logs"] = {} end
     if ofs3.preferences.menulastselected["logs_logs"] == nil then ofs3.preferences.menulastselected["logs_logs"] = 1 end
 
-    -- Group logs by date
     local groupedLogs = {}
     for _, filename in ipairs(logs) do
         local datePart = filename:match("(%d%d%d%d%-%d%d%-%d%d)_")
@@ -122,11 +112,9 @@ local function openPage(pidx, title, script, displaymode)
         end
     end
 
-    -- Sort dates descending
     local dates = {}
-    for date,_ in pairs(groupedLogs) do table.insert(dates, date) end
-    table.sort(dates, function(a,b) return a > b end)
-
+    for date, _ in pairs(groupedLogs) do table.insert(dates, date) end
+    table.sort(dates, function(a, b) return a > b end)
 
     if #dates == 0 then
 
@@ -149,51 +137,43 @@ local function openPage(pidx, title, script, displaymode)
 
         for idx, section in ipairs(dates) do
 
-                form.addLine(format_date(section))
-                local lc, y = 0, 0
+            form.addLine(format_date(section))
+            local lc, y = 0, 0
 
-                for pidx, page in ipairs(groupedLogs[section]) do
+            for pidx, page in ipairs(groupedLogs[section]) do
 
-                            if lc == 0 then
-                                y = form.height() + (ofs3.preferences.general.iconsize == 2 and ofs3.app.radio.buttonPadding or ofs3.app.radio.buttonPaddingSmall)
-                            end
+                if lc == 0 then y = form.height() + (ofs3.preferences.general.iconsize == 2 and ofs3.app.radio.buttonPadding or ofs3.app.radio.buttonPaddingSmall) end
 
-                            local x = (buttonW + padding) * lc
-                            if ofs3.preferences.general.iconsize ~= 0 then
-                                if ofs3.app.gfx_buttons["logs_logs"][pidx] == nil then ofs3.app.gfx_buttons["logs_logs"][pidx] = lcd.loadMask("app/modules/logs/gfx/logs.png") end
-                            else
-                                ofs3.app.gfx_buttons["logs_logs"][pidx] = nil
-                            end
-
-                            ofs3.app.formFields[pidx] = form.addButton(line, {x = x, y = y, w = buttonW, h = buttonH}, {
-                                text = extractHourMinute(page),
-                                icon = ofs3.app.gfx_buttons["logs_logs"][pidx],
-                                options = FONT_S,
-                                paint = function() end,
-                                press = function()
-                                    ofs3.preferences.menulastselected["logs_logs"] = tostring(idx) .. "_" .. tostring(pidx)
-                                    ofs3.app.ui.progressDisplay()
-                                    ofs3.app.ui.openPage(pidx, "Logs", "logs/logs_view.lua", page)                       
-                                end
-                            })
-
-                            if ofs3.preferences.menulastselected["logs_logs"] == tostring(idx) .. "_" .. tostring(pidx) then
-                                ofs3.app.formFields[pidx]:focus()
-                            end
-
-                            if not ofs3.tasks or not ofs3.tasks.active() then
-                                ofs3.app.formFields[pidx]:enable(false)
-                            end
-
-                            lc = (lc + 1) % numPerRow
-
+                local x = (buttonW + padding) * lc
+                if ofs3.preferences.general.iconsize ~= 0 then
+                    if ofs3.app.gfx_buttons["logs_logs"][pidx] == nil then ofs3.app.gfx_buttons["logs_logs"][pidx] = lcd.loadMask("app/modules/logs/gfx/logs.png") end
+                else
+                    ofs3.app.gfx_buttons["logs_logs"][pidx] = nil
                 end
 
-        end   
+                ofs3.app.formFields[pidx] = form.addButton(line, {x = x, y = y, w = buttonW, h = buttonH}, {
+                    text = extractHourMinute(page),
+                    icon = ofs3.app.gfx_buttons["logs_logs"][pidx],
+                    options = FONT_S,
+                    paint = function() end,
+                    press = function()
+                        ofs3.preferences.menulastselected["logs_logs"] = tostring(idx) .. "_" .. tostring(pidx)
+                        ofs3.app.ui.progressDisplay()
+                        ofs3.app.ui.openPage(pidx, "Logs", "logs/logs_view.lua", page)
+                    end
+                })
 
-            
+                if ofs3.preferences.menulastselected["logs_logs"] == tostring(idx) .. "_" .. tostring(pidx) then ofs3.app.formFields[pidx]:focus() end
+
+                if not ofs3.tasks or not ofs3.tasks.active() then ofs3.app.formFields[pidx]:enable(false) end
+
+                lc = (lc + 1) % numPerRow
+
+            end
+
+        end
+
     end
-
 
     ofs3.app.triggers.closeProgressLoader = true
 
@@ -203,39 +183,15 @@ local function openPage(pidx, title, script, displaymode)
 end
 
 local function event(widget, category, value, x, y)
-    if  value == 35 then
+    if value == 35 then
         ofs3.app.ui.openMainMenu()
         return true
     end
     return false
 end
 
-local function wakeup()
+local function wakeup() if enableWakeup == true then end end
 
-    if enableWakeup == true then
+local function onNavMenu() ofs3.app.ui.openMainMenu() end
 
-    end
-
-end
-
-local function onNavMenu()
-
-      --ofs3.app.ui.openPage(ofs3.app.lastIdx, ofs3.app.lastTitle, "logs/logs_dir.lua")
-    ofs3.app.ui.openMainMenu()
-
-end
-
-return {
-    event = event,
-    openPage = openPage,
-    wakeup = wakeup,
-    onNavMenu = onNavMenu,
-    navButtons = {
-        menu = true,
-        save = false,
-        reload = false,
-        tool = false,
-        help = true
-    },
-    API = {},
-}
+return {event = event, openPage = openPage, wakeup = wakeup, onNavMenu = onNavMenu, navButtons = {menu = true, save = false, reload = false, tool = false, help = true}, API = {}}
