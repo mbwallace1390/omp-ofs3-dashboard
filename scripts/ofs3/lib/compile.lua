@@ -1,241 +1,205 @@
-local ofs3 = require("ofs3")
 --[[
- * ofs3 - Deferred/Throttled Lua Script Compilation and Caching (ENV-aware, keyed by config.baseDir)
- * License GPLv3: https://www.gnu.org/licenses/gpl-3.0.en.html
-]]
+  Copyright (C) 2025 Rob Thomson
+  GPLv3 — https://www.gnu.org/licenses/gpl-3.0.en.html
+]] --
+
+local ofs3 = require("ofs3")
 
 local compile = {}
 local arg = {...}
 local config = arg[1] or {}
--- Use the suite key passed from main.lua (ofs3.config.baseDir = "ofs3")
+
 local SUITE = (config and config.baseDir) or "suite"
 
--- Capture the environment we were loaded with so all subsequent loads
--- run with the same `_ENV` (which includes `ofs3` from main.lua).
 local ENV = _ENV or _G
 
--- Helper to load files inside ENV (Lua 5.2+/5.3) with 5.1 fallback
 local function loadfile_in_env(path)
-  if setfenv and _VERSION == "Lua 5.1" then
-    local chunk, err = loadfile(path)
-    if not chunk then return nil, err end
-    setfenv(chunk, ENV)
-    return chunk
-  else
-    -- nil mode: accept text/bytecode; run under ENV (more ETHOS-compatible)
-    return loadfile(path, nil, ENV)
-  end
+    if setfenv and _VERSION == "Lua 5.1" then
+        local chunk, err = loadfile(path)
+        if not chunk then return nil, err end
+        setfenv(chunk, ENV)
+        return chunk
+    else
+
+        return loadfile(path, nil, ENV)
+    end
 end
 
 compile._startTime = os.clock()
-compile._startupDelay = 15 -- seconds before starting any compiles
+compile._startupDelay = 15
 
--- Configuration: expects ofs3.config to be available via ENV
 local logTimings = true
-if ofs3 and ofs3.config then
-  if type(ofs3.preferences.developer.compilerTiming) == "boolean" then
-    logTimings = ofs3.preferences.developer.compilerTiming or false
-  end
-end
+if ofs3 and ofs3.config then if type(ofs3.preferences.developer.compilerTiming) == "boolean" then logTimings = ofs3.preferences.developer.compilerTiming or false end end
 
--- Suite-specific compiled directory to avoid cross-suite clashes
-local baseDir     = "./"
+local baseDir = "./"
 local compiledDir = baseDir .. "cache/" .. SUITE .. "/"
 local SCRIPT_PREFIX = "SCRIPTS:"
 
--- Ensure cache directories exist
 os.mkdir("cache")
 os.mkdir(compiledDir)
 
--- On-disk compiled files index
 local disk_cache = {}
 do
-  local list = system.listFiles and system.listFiles(compiledDir) or {}
-  for _, fname in ipairs(list) do
-    disk_cache[fname] = true
-  end
+    local list = system.listFiles and system.listFiles(compiledDir) or {}
+    for _, fname in ipairs(list) do disk_cache[fname] = true end
 end
 
--- Unified cache-safe name generator (prefixed by suite)
 local function cachename(name)
-  if name:sub(1, #SCRIPT_PREFIX) == SCRIPT_PREFIX then
-    name = name:sub(#SCRIPT_PREFIX + 1)
-  end
-  name = name:gsub("/", "_")
-  name = name:gsub("^_", "", 1)
-  return SUITE .. "__" .. name
+    if name:sub(1, #SCRIPT_PREFIX) == SCRIPT_PREFIX then name = name:sub(#SCRIPT_PREFIX + 1) end
+    name = name:gsub("/", "_")
+    name = name:gsub("^_", "", 1)
+    return SUITE .. "__" .. name
 end
 
---------------------------------------------------
--- Adaptive LRU Cache (in-memory loaders, interval-based eviction)
---------------------------------------------------
-local LUA_RAM_THRESHOLD = 32 * 1024 -- 32 KB free (bytes)
-local LRU_HARD_LIMIT = 50           -- absolute maximum (safety)
-local EVICT_INTERVAL = 5            -- seconds between eviction checks
+local LUA_RAM_THRESHOLD = 32 * 1024
+local LRU_HARD_LIMIT = 50
+local EVICT_INTERVAL = 5
 
 local function LRUCache()
-  local self = {
-    cache = {},
-    order = {},
-    _last_evict = 0,
-  }
+    local self = {cache = {}, order = {}, _last_evict = 0}
 
-  function self:get(key)
-    local value = self.cache[key]
-    if value then
-      for i, k in ipairs(self.order) do
-        if k == key then
-          table.remove(self.order, i)
-          break
+    function self:get(key)
+        local value = self.cache[key]
+        if value then
+            for i, k in ipairs(self.order) do
+                if k == key then
+                    table.remove(self.order, i)
+                    break
+                end
+            end
+            table.insert(self.order, key)
         end
-      end
-      table.insert(self.order, key)
+        return value
     end
-    return value
-  end
 
-  function self:evict_if_low_memory()
-    self._last_evict = os.clock()
-    local usage = system.getMemoryUsage and system.getMemoryUsage()
-    while #self.order > 0 do
-      if usage and usage.luaRamAvailable and usage.luaRamAvailable < LUA_RAM_THRESHOLD then
-        local oldest = table.remove(self.order, 1)
-        self.cache[oldest] = nil
-        usage = system.getMemoryUsage()
-      elseif #self.order > LRU_HARD_LIMIT then
-        local oldest = table.remove(self.order, 1)
-        self.cache[oldest] = nil
-      else
-        break
-      end
-    end
-  end
-
-  function self:set(key, value)
-    if not self.cache[key] then
-      table.insert(self.order, key)
-    else
-      for i, k in ipairs(self.order) do
-        if k == key then
-          table.remove(self.order, i)
-          break
+    function self:evict_if_low_memory()
+        self._last_evict = os.clock()
+        local usage = system.getMemoryUsage and system.getMemoryUsage()
+        while #self.order > 0 do
+            if usage and usage.luaRamAvailable and usage.luaRamAvailable < LUA_RAM_THRESHOLD then
+                local oldest = table.remove(self.order, 1)
+                self.cache[oldest] = nil
+                usage = system.getMemoryUsage()
+            elseif #self.order > LRU_HARD_LIMIT then
+                local oldest = table.remove(self.order, 1)
+                self.cache[oldest] = nil
+            else
+                break
+            end
         end
-      end
-      table.insert(self.order, key)
     end
-    self.cache[key] = value
 
-    local now = os.clock()
-    if now - self._last_evict > EVICT_INTERVAL then
-      self:evict_if_low_memory()
+    function self:set(key, value)
+        if not self.cache[key] then
+            table.insert(self.order, key)
+        else
+            for i, k in ipairs(self.order) do
+                if k == key then
+                    table.remove(self.order, i)
+                    break
+                end
+            end
+            table.insert(self.order, key)
+        end
+        self.cache[key] = value
+
+        local now = os.clock()
+        if now - self._last_evict > EVICT_INTERVAL then self:evict_if_low_memory() end
     end
-  end
 
-  return self
+    return self
 end
 
 local lru_cache = LRUCache()
 
---------------------------------------------------
--- Throttled Compile Queue System
---------------------------------------------------
 compile._queue = {}
 compile._queued_map = {}
 
 function compile._enqueue(script, cache_path, cache_fname)
-  if not compile._queued_map[cache_fname] then
-    table.insert(compile._queue, {script = script, cache_path = cache_path, cache_fname = cache_fname})
-    compile._queued_map[cache_fname] = true
-  end
+    if not compile._queued_map[cache_fname] then
+        table.insert(compile._queue, {script = script, cache_path = cache_path, cache_fname = cache_fname})
+        compile._queued_map[cache_fname] = true
+    end
 end
 
 function compile.wakeup()
-  local now = os.clock()
-  if (now - compile._startTime) < compile._startupDelay then
-    return
-  end
-  if #compile._queue > 0 then
-    local entry = table.remove(compile._queue, 1)
-    compile._queued_map[entry.cache_fname] = nil
-    local ok, err = pcall(function()
-      system.compile(entry.script)
-      os.rename(entry.script .. "c", entry.cache_path)
-      disk_cache[entry.cache_fname] = true
-    end)
-    compile._lastCompile = now
-    if ofs3 and ofs3.utils then
-      if ok then
-        ofs3.utils.log("Deferred-compiled (throttled): " .. entry.script, "info")
-      else
-        ofs3.utils.log("Deferred-compile error: " .. tostring(err), "debug")
-      end
+    local now = os.clock()
+    if (now - compile._startTime) < compile._startupDelay then return end
+    if #compile._queue > 0 then
+        local entry = table.remove(compile._queue, 1)
+        compile._queued_map[entry.cache_fname] = nil
+        local ok, err = pcall(function()
+            system.compile(entry.script)
+            os.rename(entry.script .. "c", entry.cache_path)
+            disk_cache[entry.cache_fname] = true
+        end)
+        compile._lastCompile = now
+        if ofs3 and ofs3.utils then
+            if ok then
+                ofs3.utils.log("Deferred-compiled (throttled): " .. entry.script, "info")
+            else
+                ofs3.utils.log("Deferred-compile error: " .. tostring(err), "debug")
+            end
+        end
     end
-  end
 end
 
--- ENV-aware loadfile
 function compile.loadfile(script)
-  local startTime
-  if logTimings then startTime = os.clock() end
+    local startTime
+    if logTimings then startTime = os.clock() end
 
-  local loader, which
-  local cache_fname = cachename(script) .. "c"
-  local cache_key   = cache_fname
+    local loader, which
+    local cache_fname = cachename(script) .. "c"
+    local cache_key = cache_fname
 
-  loader = lru_cache:get(cache_key)
-  if loader then
-    which = "in-memory"
-  else
-    if not ofs3.preferences.developer.compile then
-      loader = loadfile_in_env(script)
-      which = "raw"
-    else
-      local cache_path = compiledDir .. cache_fname
-      if disk_cache[cache_fname] then
-        loader = loadfile_in_env(cache_path)
-        which = "compiled"
-      else
-        compile._enqueue(script, cache_path, cache_fname)
-        loader = loadfile_in_env(script)
-        which = "raw (queued for deferred compile)"
-      end
-    end
+    loader = lru_cache:get(cache_key)
     if loader then
-      lru_cache:set(cache_key, loader)
+        which = "in-memory"
+    else
+        if not ofs3.preferences.developer.compile then
+            loader = loadfile_in_env(script)
+            which = "raw"
+        else
+            local cache_path = compiledDir .. cache_fname
+            if disk_cache[cache_fname] then
+                loader = loadfile_in_env(cache_path)
+                which = "compiled"
+            else
+                compile._enqueue(script, cache_path, cache_fname)
+                loader = loadfile_in_env(script)
+                which = "raw (queued for deferred compile)"
+            end
+        end
+        if loader then lru_cache:set(cache_key, loader) end
     end
-  end
 
-  if not loader then
-    return nil, ("Failed to load script '%s' (%s)"):format(script, which or "unknown")
-  end
+    if not loader then return nil, ("Failed to load script '%s' (%s)"):format(script, which or "unknown") end
 
-  return loader
+    return loader
 end
 
 function compile.dofile(script, ...)
-  local chunk = compile.loadfile(script)
-  return chunk(...)
+    local chunk = compile.loadfile(script)
+    return chunk(...)
 end
 
 function compile.require(modname)
-  -- Suite-scoped module cache to avoid clashes across suites
-  local key = SUITE .. ":" .. modname
-  if package.loaded[key] then
+
+    local key = SUITE .. ":" .. modname
+    if package.loaded[key] then return package.loaded[key] end
+
+    local raw_path = modname:gsub("%.", "/") .. ".lua"
+    local chunk
+
+    if not ofs3.preferences.developer.compile then
+        chunk = assert(loadfile_in_env(raw_path))
+    else
+        chunk = compile.loadfile(raw_path)
+    end
+
+    local result = chunk()
+    package.loaded[key] = (result == nil) and true or result
     return package.loaded[key]
-  end
-
-  local raw_path = modname:gsub("%.", "/") .. ".lua"
-  local chunk
-
-  if not ofs3.preferences.developer.compile then
-    chunk = assert(loadfile_in_env(raw_path))
-  else
-    chunk = compile.loadfile(raw_path)
-  end
-
-  local result = chunk()
-  package.loaded[key] = (result == nil) and true or result
-  return package.loaded[key]
 end
 
 return compile
