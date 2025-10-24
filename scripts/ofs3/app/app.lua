@@ -491,6 +491,8 @@ function app.close()
     ofs3.session.activeRateProfileLast = nil
     ofs3.session.activeRateTable = nil
 
+    app.initialized = false
+
     collectgarbage()
     invalidatePages()
 
