@@ -102,7 +102,7 @@ function utils.getInlinePositions(f, lPage)
     local eY = ofs3.app.radio.linePaddingTop
 
     f.t = f.t or ""
-    lcd.font(FONT_M)
+    lcd.font(FONT_STD)
     local tsizeW, tsizeH = lcd.getTextSize(f.t)
 
     local multipliers = {[1] = 1, [2] = 3, [3] = 5, [4] = 7, [5] = 9}

@@ -54,13 +54,13 @@ function utils.getFontListsForResolution()
 
     local radios = {
 
-        ["800x480"] = {value_default = {FONT_XXS, FONT_XS, FONT_S, FONT_M, FONT_L, FONT_XL, FONT_XXL, FONT_XXXXL}, value_reduced = {FONT_XXS, FONT_XS, FONT_S, FONT_M, FONT_L}, value_title = {FONT_XXS, FONT_XS, FONT_S, FONT_M}},
+        ["800x480"] = {value_default = {FONT_XXS, FONT_XS, FONT_S, FONT_STD, FONT_L, FONT_XL, FONT_XXL, FONT_XXXXL}, value_reduced = {FONT_XXS, FONT_XS, FONT_S, FONT_STD, FONT_L}, value_title = {FONT_XXS, FONT_XS, FONT_S, FONT_STD}},
 
-        ["480x320"] = {value_default = {FONT_XXS, FONT_XS, FONT_S, FONT_M, FONT_L, FONT_XL}, value_reduced = {FONT_XXS, FONT_XS, FONT_S, FONT_M, FONT_L}, value_title = {FONT_XXS, FONT_XS, FONT_S}},
+        ["480x320"] = {value_default = {FONT_XXS, FONT_XS, FONT_S, FONT_STD, FONT_L, FONT_XL}, value_reduced = {FONT_XXS, FONT_XS, FONT_S, FONT_STD, FONT_L}, value_title = {FONT_XXS, FONT_XS, FONT_S}},
 
-        ["480x272"] = {value_default = {FONT_XXS, FONT_XS, FONT_S, FONT_M}, value_reduced = {FONT_XXS, FONT_XS, FONT_S}, value_title = {FONT_XXS, FONT_XS, FONT_S}},
+        ["480x272"] = {value_default = {FONT_XXS, FONT_XS, FONT_S, FONT_STD}, value_reduced = {FONT_XXS, FONT_XS, FONT_S}, value_title = {FONT_XXS, FONT_XS, FONT_S}},
 
-        ["640x360"] = {value_default = {FONT_XXS, FONT_XS, FONT_S, FONT_M, FONT_L, FONT_XL}, value_reduced = {FONT_XXS, FONT_XS, FONT_S, FONT_M, FONT_L}, value_title = {FONT_XXS, FONT_XS, FONT_S}}
+        ["640x360"] = {value_default = {FONT_XXS, FONT_XS, FONT_S, FONT_STD, FONT_L, FONT_XL}, value_reduced = {FONT_XXS, FONT_XS, FONT_S, FONT_STD, FONT_L}, value_title = {FONT_XXS, FONT_XS, FONT_S}}
     }
     if not radios[resolution] then
         ofs3.utils.log("Unsupported resolution: " .. resolution .. ". Using default fonts.", "info")
@@ -145,7 +145,7 @@ function utils.screenError(msg, border, pct, padX, padY)
     local w, h = lcd.getWindowSize()
     local isDarkMode = lcd.darkMode()
 
-    local fonts = {FONT_XXS, FONT_XS, FONT_S, FONT_M, FONT_L, FONT_XL, FONT_XXL, FONT_XXXXL}
+    local fonts = {FONT_XXS, FONT_XS, FONT_S, FONT_STD, FONT_L, FONT_XL, FONT_XXL, FONT_XXXXL}
 
     local maxW, maxH = w * pct, h * pct
     local bestFont, bestW, bestH = FONT_XXS, 0, 0
@@ -323,7 +323,7 @@ function utils.box(x, y, w, h, title, titlepos, titlealign, titlefont, titlespac
     local actualTitleFont, tsizeW, tsizeH = nil, 0, 0
     if title then
         local minValueFontH = 9999
-        for _, vf in ipairs(fontCache.value_default or {FONT_M}) do
+        for _, vf in ipairs(fontCache.value_default or {FONT_STD}) do
             lcd.font(vf)
             local _, vh = lcd.getTextSize("8")
             if vh < minValueFontH then minValueFontH = vh end

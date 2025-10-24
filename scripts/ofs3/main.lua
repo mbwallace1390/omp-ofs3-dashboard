@@ -10,7 +10,7 @@ package.loaded.ofs3 = ofs3
 
 local _ENV = setmetatable({ofs3 = ofs3}, {__index = _G, __newindex = function(_, k) print("attempt to create global '" .. tostring(k) .. "'", 2) end})
 
-if not FONT_M then FONT_M = FONT_STD end
+if not FONT_STD then FONT_STD = FONT_STD end
 
 local config = {
     toolName = "OFS3",
@@ -73,7 +73,7 @@ local function unsupported_tool()
         paint = function()
             local w, h = lcd.getWindowSize()
             lcd.color(lcd.RGB(255, 255, 255, 1))
-            lcd.font(FONT_M)
+            lcd.font(FONT_STD)
             local msg = string.format("ETHOS < V%d.%d.%d", table.unpack(ofs3.config.ethosVersion))
             local tw, th = lcd.getTextSize(msg)
             lcd.drawText((w - tw) / 2, (h - th) / 2, msg)
