@@ -5,6 +5,6 @@
 
 local ofs3 = require("ofs3")
 
-local init = {interval = 0.25, script = "logger.lua", linkrequired = false, spreadschedule = true, simulatoronly = true}
+local init = {interval = 0.25, script = "logger.lua", linkrequired = false, spreadschedule = true, simulatoronly = false}
 
 return init
