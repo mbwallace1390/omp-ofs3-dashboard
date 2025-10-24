@@ -8,6 +8,10 @@ OFS3 for ethos is a port of the core parts of rotorflight dashboard to support O
 
 <img src="https://github.com/robthomson/omp-ofs3-dashboard/blob/main/.github/gfx/menu.png?raw=true" width="800" alt="MENU">
 
+
+**FPORT Support**
+Please set a 'dummy channel' on CH8 that is toggled to indicated heli / radio arm status.  This is used to track when the lua code should start logging.
+
 -----
 Like what you see.  Consider donating..
 
