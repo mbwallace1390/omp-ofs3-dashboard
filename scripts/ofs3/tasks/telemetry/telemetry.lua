@@ -57,7 +57,6 @@ local filteredOnchangeSensors = nil
 local onchangeInitialized = false
 
 local sensorTable = {
-
     rssi = {
         name = "@i18n(telemetry.sensors.rssi)@",
         mandatory = true,
@@ -65,7 +64,12 @@ local sensorTable = {
         switch_alerts = true,
         unit = UNIT_PERCENT,
         unit_string = "%",
-        sensors = {sim = {{appId = 0xF010, subId = 0}}, sport = {{appId = 0xF010, subId = 0}}, crsf = {{crsfId = 0x14, subId = 2}}, crsfLegacy = {{crsfId = 0x14, subIdStart = 0, subIdEnd = 1}}}
+        sensors = {
+            sim   = { { appId = 0xF010, subId = 0 } },
+            sport = { { appId = 0xF010, subId = 0 } },
+            crsf  = { { crsfId = 0x14, subId = 2 } },
+            crsfLegacy = { { crsfId = 0x14, subIdStart = 0, subIdEnd = 1 } },
+        },
     },
 
     link = {
@@ -75,7 +79,12 @@ local sensorTable = {
         switch_alerts = true,
         unit = UNIT_DB,
         unit_string = "dB",
-        sensors = {sim = {{appId = 0xF101, subId = 0}}, sport = {{appId = 0xF101, subId = 0}, "RSSI"}, crsf = {{crsfId = 0x14, subIdStart = 0, subIdEnd = 1}, "Rx RSSI1"}, crsfLegacy = {{crsfId = 0x14, subIdStart = 0, subIdEnd = 1}, "RSSI 1", "RSSI 2"}}
+        sensors = {
+            sim   = { { appId = 0xF101, subId = 0 } },
+            sport = { { appId = 0xF101, subId = 0 }, "RSSI" },
+            crsf  = { { crsfId = 0x14, subIdStart = 0, subIdEnd = 1 }, "Rx RSSI1" },
+            crsfLegacy = { { crsfId = 0x14, subIdStart = 0, subIdEnd = 1 }, "RSSI 1", "RSSI 2" },
+        },
     },
 
     armed = {
@@ -85,7 +94,22 @@ local sensorTable = {
         switch_alerts = false,
         unit = UNIT_RAW,
         unit_string = "",
-        sensors = {sim = {{uid = 0x5FE0, unit = UNIT_RAW, dec = 0, value = function() return not ofs3.utils.simSensors('armed') end, min = 0, max = 1}}, crsf = {{appId = 0x5FE0, subId = 0}}}
+        sensors = {
+            sim = {
+                {
+                    uid = 0x5FE0,
+                    unit = UNIT_RAW,
+                    dec = 0,
+                    value = function()
+                        return not ofs3.utils.simSensors("armed")
+                    end,
+                    min = 0,
+                    max = 1,
+                },
+            },
+            crsf = { { appId = 0x5FE0, subId = 0 } },
+            sport = { { appId = 0x5FE0 }, "Armed" },
+        },
     },
 
     profile = {
@@ -95,7 +119,22 @@ local sensorTable = {
         switch_alerts = false,
         unit = UNIT_RAW,
         unit_string = "",
-        sensors = {sim = {{uid = 0x5FE1, unit = UNIT_RAW, dec = 0, value = function() return ofs3.utils.simSensors('profile') end, min = 0, max = 3}}, crsf = {{appId = 0x5FE1, subId = 0}}}
+        sensors = {
+            sim = {
+                {
+                    uid = 0x5FE1,
+                    unit = UNIT_RAW,
+                    dec = 0,
+                    value = function()
+                        return ofs3.utils.simSensors("profile")
+                    end,
+                    min = 0,
+                    max = 3,
+                },
+            },
+            crsf = { { appId = 0x5FE1, subId = 0 } },
+            sport = { { appId = 0x5FE1 }, "Profile" },
+        },
     },
 
     voltage = {
@@ -106,7 +145,22 @@ local sensorTable = {
         switch_alerts = true,
         unit = UNIT_VOLT,
         unit_string = "V",
-        sensors = {sim = {{uid = 0x5002, unit = UNIT_VOLT, dec = 2, value = function() return ofs3.utils.simSensors('voltage') end, min = 0, max = 3000}}, crsf = {"Rx Batt"}}
+        sensors = {
+            sim = {
+                {
+                    uid = 0x5002,
+                    unit = UNIT_VOLT,
+                    dec = 2,
+                    value = function()
+                        return ofs3.utils.simSensors("voltage")
+                    end,
+                    min = 0,
+                    max = 3000,
+                },
+            },
+            crsf = { "Rx Batt" },
+            sport = { { appId = 0x0B50, subId = 0 }, "ESC Voltage" },
+        },
     },
 
     rpm = {
@@ -117,7 +171,22 @@ local sensorTable = {
         switch_alerts = true,
         unit = UNIT_RPM,
         unit_string = "rpm",
-        sensors = {sim = {{uid = 0x5003, unit = UNIT_RPM, dec = nil, value = function() return ofs3.utils.simSensors('rpm') end, min = 0, max = 4000}}, crsf = {"GPS alt"}}
+        sensors = {
+            sim = {
+                {
+                    uid = 0x5003,
+                    unit = UNIT_RPM,
+                    dec = nil,
+                    value = function()
+                        return ofs3.utils.simSensors("rpm")
+                    end,
+                    min = 0,
+                    max = 4000,
+                },
+            },
+            crsf = { "GPS alt" },
+            sport = { { appId = 0x0500, subId = 0 }, "RPM" },
+        },
     },
 
     smartfuel = {
@@ -128,7 +197,11 @@ local sensorTable = {
         switch_alerts = true,
         unit = UNIT_PERCENT,
         unit_string = "%",
-        sensors = {sim = {{category = CATEGORY_TELEMETRY_SENSOR, appId = 0x5FDF}}, crsf = {{category = CATEGORY_TELEMETRY_SENSOR, appId = 0x5FDF}}}
+        sensors = {
+            sim  = { { category = CATEGORY_TELEMETRY_SENSOR, appId = 0x5FDF } },
+            crsf = { { category = CATEGORY_TELEMETRY_SENSOR, appId = 0x5FDF } },
+            sport = { { category = CATEGORY_TELEMETRY_SENSOR, appId = 0x5FDF } },
+        },
     },
 
     current = {
@@ -139,7 +212,22 @@ local sensorTable = {
         switch_alerts = true,
         unit = UNIT_AMPERE,
         unit_string = "A",
-        sensors = {sim = {{uid = 0x5004, unit = UNIT_AMPERE, dec = 0, value = function() return ofs3.utils.simSensors('current') end, min = 0, max = 300}}, crsf = {"Rx Current"}}
+        sensors = {
+            sim = {
+                {
+                    uid = 0x5004,
+                    unit = UNIT_AMPERE,
+                    dec = 0,
+                    value = function()
+                        return ofs3.utils.simSensors("current")
+                    end,
+                    min = 0,
+                    max = 300,
+                },
+            },
+            crsf = { "Rx Current" },
+            sport = { { appId = 0x0B50, subId = 1 }, "ESC current" },
+        },
     },
 
     temp_esc = {
@@ -149,18 +237,37 @@ local sensorTable = {
         set_telemetry_sensors = 23,
         switch_alerts = true,
         unit = UNIT_DEGREE,
-        sensors = {sim = {{uid = 0x5005, unit = UNIT_DEGREE, dec = 0, value = function() return ofs3.utils.simSensors('temp_esc') end, min = 0, max = 100}}, crsf = {"GPS speed"}},
+        sensors = {
+            sim = {
+                {
+                    uid = 0x5005,
+                    unit = UNIT_DEGREE,
+                    dec = 0,
+                    value = function()
+                        return ofs3.utils.simSensors("temp_esc")
+                    end,
+                    min = 0,
+                    max = 100,
+                },
+            },
+            crsf = { "GPS speed" },
+            sport = { { appId = 0x0B70, subId = 0 }, "ESC temp" },
+        },
         localizations = function(value)
             local major = UNIT_DEGREE
-            if value == nil then return nil, major, nil end
+            if value == nil then
+                return nil, major, nil
+            end
 
             local prefs = ofs3.preferences.localizations
             local isFahrenheit = prefs and prefs.temperature_unit == 1
 
-            if isFahrenheit then return value * 1.8 + 32, major, "°F" end
+            if isFahrenheit then
+                return value * 1.8 + 32, major, "°F"
+            end
 
             return value, major, "°C"
-        end
+        end,
     },
 
     temp_mcu = {
@@ -170,18 +277,36 @@ local sensorTable = {
         set_telemetry_sensors = 52,
         switch_alerts = true,
         unit = UNIT_DEGREE,
-        sensors = {sim = {{uid = 0x5006, unit = UNIT_DEGREE, dec = 0, value = function() return ofs3.utils.simSensors('temp_mcu') end, min = 0, max = 100}}, crsf = {"GPS Sats"}},
+        sensors = {
+            sim = {
+                {
+                    uid = 0x5006,
+                    unit = UNIT_DEGREE,
+                    dec = 0,
+                    value = function()
+                        return ofs3.utils.simSensors("temp_mcu")
+                    end,
+                    min = 0,
+                    max = 100,
+                },
+            },
+            crsf = { "GPS Sats" },
+        },
         localizations = function(value)
             local major = UNIT_DEGREE
-            if value == nil then return nil, major, nil end
+            if value == nil then
+                return nil, major, nil
+            end
 
             local prefs = ofs3.preferences.localizations
             local isFahrenheit = prefs and prefs.temperature_unit == 1
 
-            if isFahrenheit then return value * 1.8 + 32, major, "°F" end
+            if isFahrenheit then
+                return value * 1.8 + 32, major, "°F"
+            end
 
             return value, major, "°C"
-        end
+        end,
     },
 
     fuel = {
@@ -192,7 +317,22 @@ local sensorTable = {
         switch_alerts = true,
         unit = UNIT_PERCENT,
         unit_string = "%",
-        sensors = {sim = {{uid = 0x5007, unit = UNIT_PERCENT, dec = 0, value = function() return ofs3.utils.simSensors('fuel') end, min = 0, max = 100}}, crsf = {"Rx Batt%"}}
+        sensors = {
+            sim = {
+                {
+                    uid = 0x5007,
+                    unit = UNIT_PERCENT,
+                    dec = 0,
+                    value = function()
+                        return ofs3.utils.simSensors("fuel")
+                    end,
+                    min = 0,
+                    max = 100,
+                },
+            },
+            crsf = { "Rx Batt%" },
+            sport = { { appId = 0x5FDF}, "Smart Fuel" },
+        },
     },
 
     consumption = {
@@ -203,9 +343,23 @@ local sensorTable = {
         switch_alerts = true,
         unit = UNIT_MILLIAMPERE_HOUR,
         unit_string = "mAh",
-        sensors = {sim = {{uid = 0x5008, unit = UNIT_MILLIAMPERE_HOUR, dec = 0, value = function() return ofs3.utils.simSensors('consumption') end, min = 0, max = 5000}}, crsf = {"Rx Cons"}}
-    }
-
+        sensors = {
+            sim = {
+                {
+                    uid = 0x5008,
+                    unit = UNIT_MILLIAMPERE_HOUR,
+                    dec = 0,
+                    value = function()
+                        return ofs3.utils.simSensors("consumption")
+                    end,
+                    min = 0,
+                    max = 5000,
+                },
+            },
+            crsf = { "Rx Cons" },
+            sport = { { appId = 0x0B60, subId = 1 }, "ESC consumption" },
+        },
+    },
 }
 
 function telemetry.getSensorProtocol() return protocol end
@@ -278,7 +432,17 @@ function telemetry.getSensorSource(name)
                 end
             end
         end
-
+    elseif ofs3.session.telemetryType == "sport" then
+        protocol = "sport"
+        for _, sensor in ipairs(sensorTable[name].sensors.sport or {}) do
+            local source = system.getSource(sensor)
+            if source then
+                cache_misses = cache_misses + 1
+                sensors[name] = source
+                mark_hot(name)
+                return source
+            end
+        end
     elseif ofs3.session.telemetryType == "crsf" then
         protocol = "crsf"
         for _, sensor in ipairs(sensorTable[name].sensors.crsf or {}) do

@@ -170,7 +170,7 @@ function render.wakeup(box)
         titlepaddingright = getParam(box, "titlepaddingright"),
         titlepaddingtop = getParam(box, "titlepaddingtop"),
         titlepaddingbottom = getParam(box, "titlepaddingbottom"),
-        font = getParam(box, "font") or "FONT_M",
+        font = getParam(box, "font") or "FONT_STD",
         maxfont = getParam(box, "maxfont") or "FONT_S",
         decimals = getParam(box, "decimals"),
         valuealign = getParam(box, "valuealign"),
