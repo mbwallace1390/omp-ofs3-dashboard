@@ -1,3 +1,7 @@
+# 2.0.2
+
+Support for FPORT based receivers.
+
 # 2.0.1
 
 This release includes a couple of minor bug fixes that have been reported since the 2.0.0 release.
