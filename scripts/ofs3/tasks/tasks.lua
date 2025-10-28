@@ -481,10 +481,31 @@ function tasks.wakeup()
     end
 
     local cycleFlip = schedulerTick % 2
-    if cycleFlip == 0 then
-        runNonSpreadTasks()
+
+    if ((ofs3.app and ofs3.app.guiIsRunning and not ofs3.app.escPowerCycleLoader) or not ofs3.session.isConnected) and ofs3.session.mspBusy then
+        if cycleFlip == 0 then
+            if tasks.msp then
+                local ok, err = pcall(function()
+                    tasks.msp.wakeup()
+                end)
+                if not ok then print("[ERROR][tasks.msp.wakeup]", err) end
+            end
+        else
+            if tasks.callback then
+                local ok, err = pcall(function()
+                    tasks.callback.wakeup()
+                end)
+                if not ok then print("[ERROR][tasks.callback.wakeup]", err) end
+            end
+        end
     else
-        runSpreadTasks()
+        if cycleFlip == 0 then
+            local ok, err = pcall(runNonSpreadTasks)
+            if not ok then print("[ERROR][runNonSpreadTasks]", err) end
+        else
+            local ok, err = pcall(runSpreadTasks)
+            if not ok then print("[ERROR][runSpreadTasks]", err) end
+        end
     end
 
     if tasks.profile.enabled then
