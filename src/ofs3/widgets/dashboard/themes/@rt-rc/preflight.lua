@@ -56,21 +56,28 @@ local colorMode = lcd.darkMode() and darkMode or lightMode
 local theme_section = "system/@default"
 
 local THEME_DEFAULTS = {rpm_min = 0, rpm_max = 3000, bec_min = 3.0, bec_max = 13.0, esctemp_warn = 90, esctemp_max = 140, tx_min = 7.2, tx_warn = 7.4, tx_max = 8.4}
+local DEFAULT_THEME_OPTION_KEY = "ls_full"
+local themeOptionKeysByWidth = {[800] = "ls_full", [784] = "ls_std", [640] = "ss_full", [630] = "ss_std", [480] = "ms_full", [472] = "ms_std"}
+local supportedThemeWidths = {800, 784, 640, 630, 480, 472}
 
 local function getThemeOptionKey(W)
-    if W == 800 then
-        return "ls_full"
-    elseif W == 784 then
-        return "ls_std"
-    elseif W == 640 then
-        return "ss_full"
-    elseif W == 630 then
-        return "ss_std"
-    elseif W == 480 then
-        return "ms_full"
-    elseif W == 472 then
-        return "ms_std"
+    W = tonumber(W)
+    if W == nil and system.getVersion then
+        local version = system.getVersion() or {}
+        W = tonumber(version.lcdWidth)
     end
+    W = W or 800
+
+    local closestW, closestDistance
+    for _, candidate in ipairs(supportedThemeWidths) do
+        local distance = math.abs(W - candidate)
+        if closestDistance == nil or distance < closestDistance then
+            closestW = candidate
+            closestDistance = distance
+        end
+    end
+
+    return themeOptionKeysByWidth[closestW] or DEFAULT_THEME_OPTION_KEY
 end
 
 local themeOptions = {
@@ -108,16 +115,16 @@ local header_layout = {height = headeropts.height, cols = 7, rows = 1, padding =
 
 local function buildBoxes(W)
 
-    local opts = themeOptions[getThemeOptionKey(W)] or themeOptions.unknown
+    local opts = themeOptions[getThemeOptionKey(W)] or themeOptions[DEFAULT_THEME_OPTION_KEY]
 
     return {
 
         {col = 1, row = 1, colspan = 8, rowspan = 3, type = "image", subtype = "model", bgcolor = colorMode.bgcolor},
-        {col = 1, row = 4, colspan = 8, rowspan = 3, type = "text", subtype = "telemetry", source = "rpm", nosource = "-", unit = "", transform = "floor", title = "HEADSPEED", titlepos = "bottom", titlecolor = colorMode.titlecolor, textcolor = colorMode.titlecolor, bgcolor = colorMode.bgcolor},
-        {col = 1, row = 7, colspan = 4, rowspan = 2, type = "text", subtype = "telemetry", source = "profile", title = "PROFILE", titlepos = "bottom", transform = "floor", titlecolor = colorMode.titlecolor, textcolor = colorMode.titlecolor, bgcolor = colorMode.bgcolor},
-        {col = 5, row = 7, colspan = 4, rowspan = 2, type = "time", subtype = "count", title = "FLIGHTS", titlepos = "bottom", titlecolor = colorMode.titlecolor, textcolor = colorMode.titlecolor, bgcolor = colorMode.bgcolor},
-        {col = 9, row = 7, colspan = 6, rowspan = 2, type = "time", subtype = "flight", title = "TIME", titlepos = "bottom", titlecolor = colorMode.titlecolor, textcolor = colorMode.titlecolor, bgcolor = colorMode.bgcolor},
-        {col = 15, row = 7, colspan = 6, rowspan = 2, type = "text", subtype = "telemetry", source = "rssi", nosource = "-", unit = "dB", title = "LQ", titlepos = "bottom", transform = "floor", titlecolor = colorMode.titlecolor, textcolor = colorMode.titlecolor, bgcolor = colorMode.bgcolor}, {
+        {col = 1, row = 4, colspan = 8, rowspan = 3, type = "text", subtype = "telemetry", source = "rpm", nosource = "-", unit = "", transform = "floor", title = "@i18n(widgets.dashboard.theme_headspeed)@", titlepos = "bottom", titlecolor = colorMode.titlecolor, textcolor = colorMode.titlecolor, bgcolor = colorMode.bgcolor},
+        {col = 1, row = 7, colspan = 4, rowspan = 2, type = "text", subtype = "telemetry", source = "profile", title = "@i18n(widgets.dashboard.theme_profile)@", titlepos = "bottom", transform = "floor", titlecolor = colorMode.titlecolor, textcolor = colorMode.titlecolor, bgcolor = colorMode.bgcolor},
+        {col = 5, row = 7, colspan = 4, rowspan = 2, type = "time", subtype = "count", title = "@i18n(widgets.dashboard.theme_flights)@", titlepos = "bottom", titlecolor = colorMode.titlecolor, textcolor = colorMode.titlecolor, bgcolor = colorMode.bgcolor},
+        {col = 9, row = 7, colspan = 6, rowspan = 2, type = "time", subtype = "flight", title = "@i18n(widgets.dashboard.theme_time)@", titlepos = "bottom", titlecolor = colorMode.titlecolor, textcolor = colorMode.titlecolor, bgcolor = colorMode.bgcolor},
+        {col = 15, row = 7, colspan = 6, rowspan = 2, type = "text", subtype = "telemetry", source = "rssi", nosource = "-", unit = "dB", title = "@i18n(widgets.dashboard.theme_lq)@", titlepos = "bottom", transform = "floor", titlecolor = colorMode.titlecolor, textcolor = colorMode.titlecolor, bgcolor = colorMode.bgcolor}, {
             type = "gauge",
             subtype = "arc",
             col = 9,
@@ -132,7 +139,7 @@ local function buildBoxes(W)
             max = 100,
             font = opts.font,
             arcbgcolor = colorMode.arcbgcolor,
-            title = "FUEL",
+            title = "@i18n(widgets.dashboard.theme_fuel)@",
             titlepos = "bottom",
             titlecolor = colorMode.titlecolor,
             textcolor = colorMode.titlecolor,
@@ -150,7 +157,7 @@ local function buildBoxes(W)
             subtype = "arc",
             source = "voltage",
             fillbgcolor = colorMode.fillbgcolor,
-            title = "VOLTAGE",
+            title = "@i18n(widgets.dashboard.theme_voltage)@",
             font = opts.font,
             thickness = opts.thickness,
             gaugepadding = opts.gaugepadding,
