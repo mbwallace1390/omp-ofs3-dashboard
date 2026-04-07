@@ -1,3 +1,7 @@
+# 3.0.0
+
+Rebuild of code base to provide 99% same functionality - but use less ram all round.
+
 # 2.0.2
 
 Support for FPORT based receivers.
