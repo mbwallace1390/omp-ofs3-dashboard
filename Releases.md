@@ -1,3 +1,8 @@
+# 3.0.1
+
+Improve log display
+Fix logo /model image display
+
 # 3.0.0
 
 Rebuild of code base to provide 99% same functionality - but use less ram all round.
