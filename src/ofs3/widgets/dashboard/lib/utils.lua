@@ -133,7 +133,19 @@ local function isLegacyDarkMode()
     return lcd.darkMode and lcd.darkMode() or false
 end
 
+local function supportsSystemThemeColors()
+    return ofs3
+        and ofs3.utils
+        and ofs3.utils.ethosVersionAtLeast
+        and ofs3.utils.ethosVersionAtLeast({26, 1, 0})
+        or false
+end
+
 local function resolveSystemThemeColor(constantName)
+    if not supportsSystemThemeColors() then
+        return nil
+    end
+
     local themeColor = lcd.themeColor
     if type(themeColor) ~= "function" then
         return nil
@@ -223,7 +235,7 @@ function utils.supportedResolution(W, H, supportedResolutions)
 end
 
 function utils.getThemeSignature()
-    if type(lcd.themeColor) ~= "function" then
+    if not supportsSystemThemeColors() then
         return isLegacyDarkMode() and 1 or 0
     end
 
