@@ -56,13 +56,16 @@ local currentFlightMode = "preflight"
 local hasBeenInFlight = false
 local lastStatsAt = 0
 local currentTelemetryType = nil
+local lastTelemetryAvailable = nil
 local channelSources = {}
 local rxInitializedForProtocol = nil
+local telemetryActiveSource = nil
 local flightResetEventSrc = nil
 local flightResetEventSupported = (CATEGORY_SYSTEM_EVENT ~= nil and SYSTEM_EVENT_FLIGHT_RESET ~= nil)
 local flightResetEventPrimed = false
 local lastFlightResetEventState = false
 local SRC_FLIGHT_RESET = {category = CATEGORY_SYSTEM_EVENT, member = SYSTEM_EVENT_FLIGHT_RESET}
+local SRC_TELEMETRY_ACTIVE = {category = CATEGORY_SYSTEM_EVENT, member = TELEMETRY_ACTIVE}
 
 local function copyTable(input)
     local out = {}
@@ -195,10 +198,12 @@ local function initializeModel(modelKey)
     ofs3.flightmode.current = "preflight"
     currentFlightMode = "preflight"
     currentTelemetryType = nil
+    lastTelemetryAvailable = nil
     hasBeenInFlight = false
     lastStatsAt = 0
     channelSources = {}
     rxInitializedForProtocol = nil
+    telemetryActiveSource = nil
     resetFlightEventMonitor()
 end
 
@@ -333,6 +338,55 @@ local function updateRxValues(protocol)
     end
 end
 
+local function getTelemetryActiveSource()
+    if system.getVersion().simulation then
+        return nil
+    end
+
+    if CATEGORY_SYSTEM_EVENT == nil or TELEMETRY_ACTIVE == nil then
+        return nil
+    end
+
+    if telemetryActiveSource == nil and system.getSource then
+        telemetryActiveSource = system.getSource(SRC_TELEMETRY_ACTIVE)
+    end
+
+    return telemetryActiveSource
+end
+
+local function sourceIsActive(source)
+    if not source then
+        return false
+    end
+
+    if type(source.state) ~= "function" then
+        return true
+    end
+
+    local ok, state = pcall(source.state, source)
+    if not ok then
+        return true
+    end
+
+    return state ~= false
+end
+
+local function telemetryLinkActive(protocol, rootSource)
+    if protocol == "sim" then
+        return true
+    end
+
+    local activeSource = getTelemetryActiveSource()
+    if activeSource and type(activeSource.state) == "function" then
+        local ok, state = pcall(activeSource.state, activeSource)
+        if ok then
+            return state ~= false and state ~= nil
+        end
+    end
+
+    return sourceIsActive(rootSource)
+end
+
 local function updateTelemetryState()
     local protocol, rootSource, moduleRef = telemetry.detectProtocol()
 
@@ -345,11 +399,16 @@ local function updateTelemetryState()
     ofs3.session.telemetrySensor = rootSource
     ofs3.session.telemetryModule = moduleRef
 
-    local available = protocol == "sim" or (protocol ~= nil and rootSource ~= nil)
+    local available = protocol ~= nil and telemetryLinkActive(protocol, rootSource)
+    local recovered = available and lastTelemetryAvailable == false
+    lastTelemetryAvailable = available
+
     ofs3.session.telemetryState = available
     ofs3.session.isConnected = available
     ofs3.session.isConnectedHigh = available
     ofs3.session.isConnectedLow = available
+
+    return protocol, recovered
 end
 
 local function determineFlightMode()
@@ -506,7 +565,11 @@ function runtime.wakeup()
     ofs3.session.craftName = model.name and model.name() or ofs3.session.craftName
     local systemFlightReset = handleSystemFlightReset()
 
-    updateTelemetryState()
+    local _, telemetryRecovered = updateTelemetryState()
+    local resetOnTelemetryRecovered = telemetryRecovered and currentFlightMode == "postflight"
+    if resetOnTelemetryRecovered then
+        runtime.resetFlight()
+    end
     updateRxValues(ofs3.session.telemetryType)
     ofs3.sensors.wakeup(ofs3.session.telemetryType, ofs3.session.telemetrySensor)
     if ofs3.session.telemetryType == "sim" and not ofs3.session.telemetrySensor then
@@ -518,7 +581,7 @@ function runtime.wakeup()
     end
 
     local nextFlightMode = determineFlightMode()
-    local flightModeChanged = nextFlightMode ~= currentFlightMode
+    local flightModeChanged = resetOnTelemetryRecovered or nextFlightMode ~= currentFlightMode
     currentFlightMode = nextFlightMode
     ofs3.flightmode.current = nextFlightMode
 
@@ -527,6 +590,7 @@ function runtime.wakeup()
 
     return {
         model_changed = modelChanged,
+        telemetry_recovered = telemetryRecovered,
         flightmode_changed = flightModeChanged or systemFlightReset,
         flight_reset = systemFlightReset
     }

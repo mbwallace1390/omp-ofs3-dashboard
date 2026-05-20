@@ -1,3 +1,8 @@
+# 3.0.2
+
+Ethos 26 theme support
+Reset bug fix
+
 # 3.0.1
 
 Improve log display
