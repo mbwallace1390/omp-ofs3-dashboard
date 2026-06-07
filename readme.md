@@ -8,8 +8,19 @@ OFS3 for ethos is a port of the core parts of rotorflight dashboard to support O
 
 
 
-**FPORT Support**
-Please set a 'dummy channel' on CH8 that is toggled to indicated heli / radio arm status.  This is used to track when the lua code should start logging.
+## Setup guide
+
+The dashboard auto-detects `crsf` and `sport`, and it uses different hard-coded channel maps for each protocol.
+
+See the full guide here:
+
+- [ELRS and S.Port setup guide](docs/protocol-setup.md)
+
+Quick notes:
+
+- ELRS / CRSF: arm is read from `CH5`, profile/headspeed from `CH8`
+- S.Port / F.Port: create a dummy arm mirror on `CH8`, and use `CH7` for profile/headspeed
+- Flight timing/logging needs valid arm state and RPM above `1000`
 
 -----
 Like what you see.  Consider donating..
