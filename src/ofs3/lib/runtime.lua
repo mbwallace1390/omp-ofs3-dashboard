@@ -192,6 +192,9 @@ local function initializeModel(modelKey)
     resetTimer()
 
     telemetry.reset()
+    if ofs3.logs and ofs3.logs.reset then
+        ofs3.logs.reset()
+    end
     if ofs3.events and ofs3.events.reset then
         ofs3.events.reset()
     end
@@ -544,6 +547,9 @@ function runtime.resetFlight()
     lastStatsAt = 0
 
     telemetry.sensorStats = {}
+    if ofs3.logs and ofs3.logs.reset then
+        ofs3.logs.reset()
+    end
     resetTimer()
 
     if ofs3.events and ofs3.events.reset then
@@ -587,6 +593,9 @@ function runtime.wakeup()
 
     updateTimer()
     updateStats()
+    if ofs3.logs and ofs3.logs.wakeup then
+        ofs3.logs.wakeup(currentFlightMode)
+    end
 
     return {
         model_changed = modelChanged,

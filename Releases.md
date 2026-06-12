@@ -1,3 +1,7 @@
+# 3.0.3
+
+Fix flight telemetry CSV logging so flights are saved to the logs directory during inflight state.
+
 # 3.0.2
 
 Ethos 26 theme support
