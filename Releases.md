@@ -1,3 +1,7 @@
+# 3.0.4
+
+Small improvement to system to reduce memory usage while in use.
+
 # 3.0.3
 
 Fix flight telemetry CSV logging so flights are saved to the logs directory during inflight state.
