@@ -112,9 +112,9 @@ end
 
 local function drawCheckRow(x, y, w, label, value, stateColor, compact)
     lcd.color(stateColor)
-    lcd.drawFilledRectangle(floor(x), floor(y + (compact and 5 or 6)), 7, 7)
-    common.drawTextAligned(x + 14, y, w * 0.44, label, compact and "FONT_XXS" or "FONT_XS", C.muted, "left")
-    common.drawTextAligned(x + w * 0.46, y - (compact and 1 or 0), w * 0.54, value, compact and "FONT_XS" or "FONT_S", C.white, "right")
+    lcd.drawFilledRectangle(floor(x), floor(y + 5), 7, 7)
+    common.drawTextAligned(x + 14, y, w * 0.42, label, compact and "FONT_XXS" or "FONT_XS", C.muted, "left")
+    common.drawTextAligned(x + w * 0.44, y - (compact and 1 or 0), w * 0.56, value, compact and "FONT_XS" or "FONT_S", C.white, "right")
 end
 
 local function paint(x, y, w, h, box, cache)
@@ -122,7 +122,10 @@ local function paint(x, y, w, h, box, cache)
     lcd.color(C.bg)
     lcd.drawFilledRectangle(floor(x), floor(y), floor(w), floor(h))
 
-    local compact = h < 360
+    -- Ethos keeps its system bars around the widget. X20 Pro dashboard zones
+    -- therefore need the compact layout even when their reported height is
+    -- slightly above the old 360 px breakpoint.
+    local compact = h < 400
     local pad = compact and 10 or 12
     local titleY = compact and 6 or 8
     common.drawTextAligned(x + pad, y + titleY, w * 0.55, "AEGIS // PRE-FLIGHT", compact and "FONT_S" or "FONT_STD", C.cyan, "left")
@@ -184,8 +187,9 @@ local function paint(x, y, w, h, box, cache)
 
     local setupY = bodyY + cardH + pad
     common.drawPanel(rightX, setupY, sideW, cardH, C.violet, "FLIGHT SETUP")
-    local rowStart = setupY + (compact and 34 or 42)
-    local rowStep = compact and max(20, floor((cardH - 43) / 3)) or 36
+    local rowStart = setupY + (compact and 31 or 42)
+    local usableRows = max(54, cardH - (compact and 39 or 43))
+    local rowStep = compact and floor(usableRows / 3) or 36
     drawCheckRow(rightX + 14, rowStart, sideW - 28, "PROFILE", common.formatValue(cache.profile, 0, ""), C.violet, compact)
     drawCheckRow(rightX + 14, rowStart + rowStep, sideW - 28, "PACK", common.formatValue(cache.voltage, 1, " V"), packColor, compact)
     drawCheckRow(rightX + 14, rowStart + rowStep * 2, sideW - 28, "STATE", cache.state or "--", cache.stateColor or C.muted, compact)
