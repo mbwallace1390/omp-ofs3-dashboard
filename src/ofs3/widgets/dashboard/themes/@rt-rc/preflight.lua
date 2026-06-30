@@ -1,265 +1,192 @@
---[[
-  Copyright (C) 2025 Rob Thomson
-  GPLv3 — https://www.gnu.org/licenses/gpl-3.0.en.html
-]] --
-
+--[[ Aegis OFS3 preflight dashboard - GPLv3 ]] --
 local ofs3 = require("ofs3")
+local lcd = lcd
+local floor = math.floor
+local min = math.min
+local tostring = tostring
 
-local utils = ofs3.widgets.dashboard.utils
-local boxes_cache = nil
-local themeconfig = nil
-local lastScreenW = nil
+local common = assert(loadfile("SCRIPTS:/" .. ofs3.config.baseDir .. "/widgets/dashboard/themes/@rt-rc/common.lua"))()
+local C = common.C
 
-local function getUserVoltageOverride(which)
-    local prefs = ofs3.session and ofs3.session.modelPreferences
-    if prefs and prefs["system/@default"] then
-        local v = tonumber(prefs["system/@default"][which])
+local layout = {cols = 12, rows = 12, padding = 0}
+local header_layout = common.headerLayout()
+local header_boxes = common.headerBoxes()
 
-        if which == "v_min" and v and math.abs(v - 18.0) > 0.05 then return v end
-        if which == "v_max" and v and math.abs(v - 25.2) > 0.05 then return v end
+local function wakeup(box, telemetry)
+    local cache = box._cache or {}
+    box._cache = cache
+
+    cache.fuel = common.sensor(telemetry, "smartfuel")
+    cache.esc = common.sensor(telemetry, "temp_esc")
+    cache.link = common.sensor(telemetry, "rssi")
+    cache.profile = common.sensor(telemetry, "profile")
+    cache.voltage = common.sensor(telemetry, "voltage")
+    cache.state, cache.stateColor, cache.isArmed = common.flightState(telemetry)
+
+    local available = 0
+    local faults = 0
+    local warnings = 0
+    local issues = {}
+    local criticalPack, warningPack = common.packLimits()
+
+    if not (ofs3.session and ofs3.session.telemetryState) then
+        cache.status = "WAITING"
+        cache.statusColor = C.muted
+        cache.statusSub = "CONNECT TELEMETRY"
+        cache.issueText = nil
+        return cache
     end
-    return nil
-end
 
-local colorMode = utils.themeColors()
-
-local theme_section = "system/@default"
-
-local THEME_DEFAULTS = {rpm_min = 0, rpm_max = 3000, bec_min = 3.0, bec_max = 13.0, esctemp_warn = 90, esctemp_max = 140, tx_min = 7.2, tx_warn = 7.4, tx_max = 8.4}
-local DEFAULT_THEME_OPTION_KEY = "ls_full"
-local themeOptionKeysByWidth = {[800] = "ls_full", [784] = "ls_std", [640] = "ss_full", [630] = "ss_std", [480] = "ms_full", [472] = "ms_std"}
-local supportedThemeWidths = {800, 784, 640, 630, 480, 472}
-
-local function getThemeOptionKey(W)
-    W = tonumber(W)
-    if W == nil and system.getVersion then
-        local version = system.getVersion() or {}
-        W = tonumber(version.lcdWidth)
+    if cache.isArmed == true then
+        faults = faults + 1
+        issues[#issues + 1] = "MODEL IS ARMED"
     end
-    W = W or 800
 
-    local closestW, closestDistance
-    for _, candidate in ipairs(supportedThemeWidths) do
-        local distance = math.abs(W - candidate)
-        if closestDistance == nil or distance < closestDistance then
-            closestW = candidate
-            closestDistance = distance
+    if cache.fuel ~= nil then
+        available = available + 1
+        if cache.fuel <= common.getConfig("fuel_warn") then
+            warnings = warnings + 1
+            issues[#issues + 1] = "SMART FUEL " .. common.formatValue(cache.fuel, 0, "%") .. " AT RESERVE"
         end
     end
 
-    return themeOptionKeysByWidth[closestW] or DEFAULT_THEME_OPTION_KEY
-end
-
-local themeOptions = {
-
-    ls_full = {font = "FONT_XXL", advfont = "FONT_STD", thickness = 30, batteryframethickness = 4, titlepaddingbottom = 15, valuepaddingleft = 25, valuepaddingtop = 40, valuepaddingbottom = 25, gaugepaddingtop = 20, gaugepadding = 20},
-
-    ls_std = {font = "FONT_XL", advfont = "FONT_STD", thickness = 30, batteryframethickness = 4, titlepaddingbottom = 0, valuepaddingleft = 75, valuepaddingtop = 5, valuepaddingbottom = 25, gaugepaddingtop = 5, gaugepadding = 10},
-
-    ms_full = {font = "FONT_XXL", advfont = "FONT_STD", thickness = 27, batteryframethickness = 4, titlepaddingbottom = 0, valuepaddingleft = 20, valuepaddingtop = 5, valuepaddingbottom = 15, gaugepaddingtop = 5, gaugepadding = 10},
-
-    ms_std = {font = "FONT_XL", advfont = "FONT_S", thickness = 20, batteryframethickness = 2, titlepaddingbottom = 0, valuepaddingleft = 20, valuepaddingtop = 10, valuepaddingbottom = 25, gaugepaddingtop = 5, gaugepadding = 5},
-
-    ss_full = {font = "FONT_XL", advfont = "FONT_STD", thickness = 25, batteryframethickness = 4, titlepaddingbottom = 0, valuepaddingleft = 20, valuepaddingtop = 5, valuepaddingbottom = 15, gaugepaddingtop = 5, gaugepadding = 10},
-
-    ss_std = {font = "FONT_XL", advfont = "FONT_S", thickness = 22, batteryframethickness = 2, titlepaddingbottom = 0, valuepaddingleft = 20, valuepaddingtop = 10, valuepaddingbottom = 25, gaugepaddingtop = 5, gaugepadding = 10}
-}
-
-local function getThemeValue(key)
-    if ofs3 and ofs3.session and ofs3.session.modelPreferences and ofs3.session.modelPreferences[theme_section] then
-        local val = ofs3.session.modelPreferences[theme_section][key]
-        val = tonumber(val)
-        if val ~= nil then return val end
+    if cache.voltage ~= nil then
+        available = available + 1
+        if cache.voltage < criticalPack then
+            faults = faults + 1
+            issues[#issues + 1] = "PACK " .. common.formatValue(cache.voltage, 1, "V") .. " BELOW MINIMUM"
+        elseif cache.voltage < warningPack then
+            warnings = warnings + 1
+            issues[#issues + 1] = "PACK " .. common.formatValue(cache.voltage, 1, "V") .. " LOW"
+        end
     end
-    return THEME_DEFAULTS[key]
-end
 
-local lastScreenW = nil
-local boxes_cache = nil
-local themeconfig = nil
-local headeropts = utils.getHeaderOptions()
-
-local layout = {cols = 20, rows = 8, padding = 1}
-
-local header_layout = {height = headeropts.height, cols = 7, rows = 1, padding = 0}
-
-local function buildBoxes(W)
-
-    local opts = themeOptions[getThemeOptionKey(W)] or themeOptions[DEFAULT_THEME_OPTION_KEY]
-
-    return {
-
-        {col = 1, row = 1, colspan = 8, rowspan = 3, type = "image", subtype = "model", bgcolor = colorMode.bgcolor},
-        {col = 1, row = 4, colspan = 8, rowspan = 3, type = "text", subtype = "telemetry", source = "rpm", nosource = "-", unit = "", transform = "floor", title = "@i18n(widgets.dashboard.theme_headspeed)@", titlepos = "bottom", titlecolor = colorMode.titlecolor, textcolor = colorMode.titlecolor, bgcolor = colorMode.bgcolor},
-        {col = 1, row = 7, colspan = 4, rowspan = 2, type = "text", subtype = "telemetry", source = "profile", title = "@i18n(widgets.dashboard.theme_profile)@", titlepos = "bottom", transform = "floor", titlecolor = colorMode.titlecolor, textcolor = colorMode.titlecolor, bgcolor = colorMode.bgcolor},
-        {col = 5, row = 7, colspan = 4, rowspan = 2, type = "time", subtype = "count", title = "@i18n(widgets.dashboard.theme_flights)@", titlepos = "bottom", titlecolor = colorMode.titlecolor, textcolor = colorMode.titlecolor, bgcolor = colorMode.bgcolor},
-        {col = 9, row = 7, colspan = 6, rowspan = 2, type = "time", subtype = "flight", title = "@i18n(widgets.dashboard.theme_time)@", titlepos = "bottom", titlecolor = colorMode.titlecolor, textcolor = colorMode.titlecolor, bgcolor = colorMode.bgcolor},
-        {col = 15, row = 7, colspan = 6, rowspan = 2, type = "text", subtype = "telemetry", source = "rssi", nosource = "-", unit = "dB", title = "@i18n(widgets.dashboard.theme_lq)@", titlepos = "bottom", transform = "floor", titlecolor = colorMode.titlecolor, textcolor = colorMode.titlecolor, bgcolor = colorMode.bgcolor}, {
-            type = "gauge",
-            subtype = "arc",
-            col = 9,
-            row = 1,
-            colspan = 6,
-            rowspan = 6,
-            thickness = opts.thickness,
-            source = "smartfuel",
-            unit = "%",
-            transform = "floor",
-            min = 0,
-            max = 100,
-            font = opts.font,
-            arcbgcolor = colorMode.arcbgcolor,
-            title = "@i18n(widgets.dashboard.theme_fuel)@",
-            titlepos = "bottom",
-            titlecolor = colorMode.titlecolor,
-            textcolor = colorMode.titlecolor,
-            bgcolor = colorMode.bgcolor,
-            gaugepadding = opts.gaugepadding,
-            valuepaddingtop = opts.valuepaddingtop,
-
-            thresholds = {{value = 30, fillcolor = colorMode.fillcritcolor, textcolor = colorMode.textcolor}, {value = 50, fillcolor = colorMode.fillwarncolor, textcolor = colorMode.textcolor}, {value = 140, fillcolor = colorMode.fillcolor, textcolor = colorMode.textcolor}}
-        }, {
-            col = 15,
-            row = 1,
-            colspan = 6,
-            rowspan = 6,
-            type = "gauge",
-            subtype = "arc",
-            source = "voltage",
-            fillbgcolor = colorMode.fillbgcolor,
-            title = "@i18n(widgets.dashboard.theme_voltage)@",
-            font = opts.font,
-            thickness = opts.thickness,
-            gaugepadding = opts.gaugepadding,
-            titlepos = "bottom",
-            fillcolor = colorMode.fillcolor,
-            titlecolor = colorMode.titlecolor,
-            textcolor = colorMode.titlecolor,
-            bgcolor = colorMode.bgcolor,
-            valuepaddingtop = opts.valuepaddingtop,
-
-            min = function()
-                local cfg = ofs3.session.batteryConfig
-                local cells = (cfg and cfg.batteryCellCount) or 3
-                local minV = (cfg and cfg.vbatmincellvoltage) or 3.0
-                return math.max(0, cells * minV)
-            end,
-
-            max = function()
-                local cfg = ofs3.session.batteryConfig
-                local cells = (cfg and cfg.batteryCellCount) or 3
-                local maxV = (cfg and cfg.vbatfullcellvoltage) or 4.2
-                return math.max(0, cells * maxV)
-            end,
-
-            thresholds = {
-                {
-                    value = function(box)
-
-                        local raw_gm = utils.getParam(box, "min")
-                        if type(raw_gm) == "function" then raw_gm = raw_gm(box) end
-
-                        local raw_gM = utils.getParam(box, "max")
-                        if type(raw_gM) == "function" then raw_gM = raw_gM(box) end
-
-                        return raw_gm + 0.30 * (raw_gM - raw_gm)
-                    end,
-                    fillcolor = colorMode.fillcritcolor,
-                    textcolor = colorMode.textcolor
-                }, {
-                    value = function(box)
-                        local raw_gm = utils.getParam(box, "min")
-                        if type(raw_gm) == "function" then raw_gm = raw_gm(box) end
-
-                        local raw_gM = utils.getParam(box, "max")
-                        if type(raw_gM) == "function" then raw_gM = raw_gM(box) end
-
-                        return raw_gm + 0.50 * (raw_gM - raw_gm)
-                    end,
-                    fillcolor = colorMode.fillwarncolor,
-                    textcolor = colorMode.textcolor
-                }, {
-                    value = function(box)
-                        local raw_gM = utils.getParam(box, "max")
-                        if type(raw_gM) == "function" then raw_gM = raw_gM(box) end
-
-                        return raw_gM
-                    end,
-                    fillcolor = colorMode.fillcolor,
-                    textcolor = colorMode.textcolor
-                }
-            }
-
-        }
-    }
-end
-
-local header_boxes = {
-
-    {col = 1, row = 1, colspan = 2, type = "text", subtype = "craftname", font = headeropts.font, valuealign = "left", valuepaddingleft = 5, bgcolor = colorMode.bgcolortop, titlecolor = colorMode.titlecolor, textcolor = colorMode.textcolor},
-
-    {col = 3, row = 1, colspan = 3, type = "image", subtype = "image", bgcolor = colorMode.bgcolortop}, {
-        col = 6,
-        row = 1,
-        type = "gauge",
-        subtype = "bar",
-        source = "txbatt",
-        font = headeropts.font,
-        battery = true,
-        batteryframe = true,
-        hidevalue = true,
-        valuealign = "left",
-        batterysegments = 4,
-        batteryspacing = 1,
-        batteryframethickness = 2,
-        batterysegmentpaddingtop = headeropts.batterysegmentpaddingtop,
-        batterysegmentpaddingbottom = headeropts.batterysegmentpaddingbottom,
-        batterysegmentpaddingleft = headeropts.batterysegmentpaddingleft,
-        batterysegmentpaddingright = headeropts.batterysegmentpaddingright,
-        gaugepaddingright = headeropts.gaugepaddingright,
-        gaugepaddingleft = headeropts.gaugepaddingleft,
-        gaugepaddingbottom = headeropts.gaugepaddingbottom,
-        gaugepaddingtop = headeropts.gaugepaddingtop,
-        fillbgcolor = colorMode.txbgfillcolor,
-        bgcolor = colorMode.bgcolortop,
-        accentcolor = colorMode.txaccentcolor,
-        textcolor = colorMode.textcolor,
-        min = getThemeValue("tx_min"),
-        max = getThemeValue("tx_max"),
-        thresholds = {{value = getThemeValue("tx_warn"), fillcolor = "orange"}, {value = getThemeValue("tx_max"), fillcolor = colorMode.txfillcolor}}
-    }, {
-        col = 7,
-        row = 1,
-        type = "gauge",
-        subtype = "step",
-        source = "rssi",
-        font = "FONT_XS",
-        stepgap = 2,
-        stepcount = 5,
-        decimals = 0,
-        valuealign = "left",
-        barpaddingleft = headeropts.barpaddingleft,
-        barpaddingright = headeropts.barpaddingright,
-        barpaddingbottom = headeropts.barpaddingbottom,
-        barpaddingtop = headeropts.barpaddingtop,
-        valuepaddingleft = headeropts.valuepaddingleft,
-        valuepaddingbottom = headeropts.valuepaddingbottom,
-        bgcolor = colorMode.bgcolortop,
-        textcolor = colorMode.textcolor,
-        fillcolor = colorMode.rssifillcolor,
-        fillbgcolor = colorMode.rssifillbgcolor
-    }
-}
-
-local function boxes()
-    local config = ofs3 and ofs3.session and ofs3.session.modelPreferences and ofs3.session.modelPreferences[theme_section]
-    local W = lcd.getWindowSize()
-    if boxes_cache == nil or themeconfig ~= config or lastScreenW ~= W then
-        boxes_cache = buildBoxes(W)
-        themeconfig = config
-        lastScreenW = W
+    if cache.esc ~= nil then
+        available = available + 1
+        if cache.esc >= common.getConfig("esc_max") then
+            faults = faults + 1
+            issues[#issues + 1] = "ESC " .. common.formatValue(cache.esc, 0, "°C") .. " AT LIMIT"
+        elseif cache.esc >= common.getConfig("esc_warn") then
+            warnings = warnings + 1
+            issues[#issues + 1] = "ESC " .. common.formatValue(cache.esc, 0, "°C") .. " ABOVE WARNING"
+        end
     end
-    return boxes_cache
+
+    if cache.link ~= nil then
+        available = available + 1
+        if cache.link < common.getConfig("link_warn") then
+            warnings = warnings + 1
+            issues[#issues + 1] = "LINK " .. common.formatValue(cache.link, 0, "%") .. " LOW"
+        end
+    end
+
+    local issueCount = faults + warnings
+    cache.issueText = issues[1]
+    if issueCount > 1 and cache.issueText then
+        cache.issueText = cache.issueText .. "  +" .. tostring(issueCount - 1) .. " MORE"
+    end
+
+    if available == 0 then
+        cache.status = "WAITING"
+        cache.statusColor = C.muted
+        cache.statusSub = "WAITING FOR SENSOR DATA"
+        cache.issueText = nil
+    elseif faults > 0 then
+        cache.status = "CHECK"
+        cache.statusColor = C.red
+        cache.statusSub = tostring(issueCount) .. " ITEM" .. (issueCount == 1 and "" or "S") .. " FLAGGED"
+    elseif warnings > 0 then
+        cache.status = "CAUTION"
+        cache.statusColor = C.amber
+        cache.statusSub = tostring(issueCount) .. " ITEM" .. (issueCount == 1 and "" or "S") .. " TO REVIEW"
+    else
+        cache.status = "READY"
+        cache.statusColor = C.green
+        cache.statusSub = "SYSTEMS NOMINAL"
+        cache.issueText = nil
+    end
+
+    return cache
 end
 
-return {layout = layout, boxes = boxes, header_boxes = header_boxes, header_layout = header_layout, scheduler = {spread_scheduling = true, spread_scheduling_paint = false, spread_ratio = 0.5}}
+local function drawCheckRow(x, y, w, label, value, stateColor)
+    lcd.color(stateColor)
+    lcd.drawFilledRectangle(floor(x), floor(y + 6), 7, 7)
+    common.drawTextAligned(x + 14, y, w * 0.45, label, "FONT_XS", C.muted, "left")
+    common.drawTextAligned(x + w * 0.48, y, w * 0.52, value, "FONT_S", C.white, "right")
+end
+
+local function paint(x, y, w, h, box, cache)
+    cache = cache or box._cache or {}
+    lcd.color(C.bg)
+    lcd.drawFilledRectangle(floor(x), floor(y), floor(w), floor(h))
+
+    local pad = 12
+    common.drawTextAligned(x + pad, y + 8, w * 0.55, "AEGIS // PRE-FLIGHT", "FONT_STD", C.cyan, "left")
+    common.drawTextAligned(x + w - 220, y + 8, 208, cache.status or "WAITING", "FONT_STD", cache.statusColor or C.muted, "right")
+
+    local bodyY = y + 42
+    local bodyH = h - 54
+    local sideW = floor(w * 0.25)
+    local centerW = w - sideW * 2 - pad * 4
+    local leftX = x + pad
+    local centerX = leftX + sideW + pad
+    local rightX = centerX + centerW + pad
+    local cardH = floor((bodyH - pad) / 2)
+
+    local fuelColor = common.fuelColor(cache.fuel)
+    local packColor = common.packColor(cache.voltage)
+    local escColor = common.escColor(cache.esc)
+    local linkColor = common.linkColor(cache.link)
+    local _, _, packFull = common.packLimits()
+
+    common.drawMetric(leftX, bodyY, sideW, cardH, "PACK VOLTAGE", common.formatValue(cache.voltage, 1, " V"), packColor, "main flight battery")
+    common.drawProgress(leftX + 12, bodyY + cardH - 36, sideW - 24, 9, cache.voltage and cache.voltage / packFull or 0, packColor)
+
+    common.drawMetric(leftX, bodyY + cardH + pad, sideW, cardH, "RADIO LINK", common.formatValue(cache.link, 0, "%"), linkColor, "telemetry link quality")
+    common.drawProgress(leftX + 12, bodyY + cardH * 2 + pad - 36, sideW - 24, 9, cache.link and cache.link / 100 or 0, linkColor)
+
+    common.drawPanel(centerX, bodyY, centerW, bodyH, cache.statusColor or C.muted, nil)
+    local cx = centerX + centerW / 2
+    local cy = bodyY + bodyH * 0.42
+    local radius = min(centerW * 0.33, bodyH * 0.32)
+    common.drawHex(cx, cy, radius + 12, C.line2)
+    common.drawHex(cx, cy, radius, cache.statusColor or C.muted)
+    common.drawTextAligned(centerX, cy - 34, centerW, cache.status or "WAITING", "FONT_XXL", C.white, "center")
+    if cache.issueText then
+        common.drawTextAligned(centerX + 12, cy + 15, centerW - 24, cache.issueText, "FONT_XS", C.white, "center")
+        common.drawTextAligned(centerX, cy + 40, centerW, cache.statusSub or "ITEM TO REVIEW", "FONT_XXS", cache.statusColor or C.muted, "center")
+    else
+        common.drawTextAligned(centerX, cy + 22, centerW, cache.statusSub or "CONNECT TELEMETRY", "FONT_XXS", cache.statusColor or C.muted, "center")
+    end
+
+    local segmentsY = bodyY + bodyH - 86
+    common.drawTextAligned(centerX + 18, segmentsY - 22, centerW - 36, "SMART FUEL", "FONT_XS", C.muted, "left")
+    common.drawTextAligned(centerX + 18, segmentsY - 24, centerW - 36, common.formatValue(cache.fuel, 0, "%"), "FONT_S", C.white, "right")
+    common.drawSegments(centerX + 18, segmentsY, centerW - 42, 18, cache.fuel or 0, 12, fuelColor)
+    lcd.color(fuelColor)
+    lcd.drawFilledRectangle(floor(centerX + centerW - 20), floor(segmentsY + 5), 5, 8)
+    common.drawStateBadge(centerX + 18, segmentsY + 31, centerW - 36, 27, cache.state, cache.stateColor)
+
+    common.drawMetric(rightX, bodyY, sideW, cardH, "ESC THERMAL", common.formatValue(cache.esc, 0, "°C"), escColor, "controller temperature")
+    common.drawProgress(rightX + 12, bodyY + cardH - 36, sideW - 24, 9, cache.esc and cache.esc / common.getConfig("esc_max") or 0, escColor)
+
+    common.drawPanel(rightX, bodyY + cardH + pad, sideW, cardH, C.violet, "FLIGHT SETUP")
+    drawCheckRow(rightX + 14, bodyY + cardH + pad + 42, sideW - 28, "PROFILE", common.formatValue(cache.profile, 0, ""), C.violet)
+    drawCheckRow(rightX + 14, bodyY + cardH + pad + 78, sideW - 28, "PACK", common.formatValue(cache.voltage, 1, " V"), packColor)
+    drawCheckRow(rightX + 14, bodyY + cardH + pad + 114, sideW - 28, "STATE", cache.state or "--", cache.stateColor or C.muted)
+end
+
+local boxes = {{
+    col = 1, row = 1, colspan = 12, rowspan = 12,
+    type = "func", subtype = "func",
+    wakeup = wakeup, paint = paint, bgcolor = "transparent"
+}}
+
+return {
+    layout = layout,
+    boxes = boxes,
+    header_boxes = header_boxes,
+    header_layout = header_layout,
+    scheduler = {spread_scheduling = true, spread_scheduling_paint = false, spread_ratio = 0.85}
+}
