@@ -145,12 +145,15 @@ local function buildBatteryConfig(prefs)
     return battery
 end
 
+local buildAegisConfig
+
 local function loadModelPreferences(modelKey)
     local merged, prefFile = loadModelPreferencesData(modelKey)
 
     ofs3.session.modelPreferences = merged
     ofs3.session.modelPreferencesFile = prefFile
     ofs3.session.batteryConfig = buildBatteryConfig(merged)
+    ofs3.session.aegisConfig = buildAegisConfig(merged, currentTelemetryType)
 end
 
 local function resetTimer()
@@ -233,15 +236,38 @@ local function normalizeBatterySettings(input)
     return output
 end
 
+local function defaultArmChannel(protocol)
+    if protocol == "sport" then
+        return 8
+    end
+    return 5
+end
+
+local function normalizeAegisSettings(input, protocol)
+    local settings = type(input) == "table" and input or {}
+    return {
+        armChannel = clamp(math.floor(tonumber(settings.armChannel) or defaultArmChannel(protocol)), 1, 24),
+        armReversed = clamp(math.floor(tonumber(settings.armReversed) or 0), 0, 1)
+    }
+end
+
+buildAegisConfig = function(prefs, protocol)
+    local section = prefs and prefs["system/aegis"] or nil
+    return normalizeAegisSettings(section, protocol)
+end
+
 function runtime.readWidgetSettings(widget)
     local modelKey = getModelKey()
     local prefs, prefFile = loadModelPreferencesData(modelKey)
     local battery = normalizeBatterySettings(buildBatteryConfig(prefs))
+    local aegis = buildAegisConfig(prefs, currentTelemetryType)
 
     if widget then
         for key, value in pairs(battery) do
             widget[key] = value
         end
+        widget.aegisArmChannel = aegis.armChannel
+        widget.aegisArmReversed = aegis.armReversed
         widget._modelKey = modelKey
         widget._preferencesFile = prefFile
     end
@@ -250,6 +276,7 @@ function runtime.readWidgetSettings(widget)
         ofs3.session.modelPreferences = prefs
         ofs3.session.modelPreferencesFile = prefFile
         ofs3.session.batteryConfig = copyTable(battery)
+        ofs3.session.aegisConfig = copyTable(aegis)
     end
 
     return battery, prefs, prefFile, modelKey
@@ -259,6 +286,10 @@ function runtime.writeWidgetSettings(widget)
     local modelKey = (widget and widget._modelKey) or getModelKey()
     local prefs, prefFile = loadModelPreferencesData(modelKey)
     local battery = normalizeBatterySettings(widget or {})
+    local aegis = normalizeAegisSettings({
+        armChannel = widget and widget.aegisArmChannel,
+        armReversed = widget and widget.aegisArmReversed
+    }, currentTelemetryType)
 
     prefs.battery = prefs.battery or {}
     for key, value in pairs(battery) do
@@ -268,12 +299,24 @@ function runtime.writeWidgetSettings(widget)
         end
     end
 
+    prefs["system/aegis"] = prefs["system/aegis"] or {}
+    prefs["system/aegis"].armChannel = aegis.armChannel
+    prefs["system/aegis"].armReversed = aegis.armReversed
+
+    if widget then
+        widget.aegisArmChannel = aegis.armChannel
+        widget.aegisArmReversed = aegis.armReversed
+    end
+
     ofs3.ini.save_ini_file(prefFile, prefs)
 
     if currentModelKey == modelKey then
         ofs3.session.modelPreferences = prefs
         ofs3.session.modelPreferencesFile = prefFile
         ofs3.session.batteryConfig = copyTable(battery)
+        ofs3.session.aegisConfig = copyTable(aegis)
+        channelSources = {}
+        rxInitializedForProtocol = nil
     end
 
     return true
@@ -285,13 +328,15 @@ local function initializeRxMap(protocol)
     ofs3.session.rx.values = ofs3.session.rx.values or {}
 
     local map = ofs3.session.rx.map
+    local aegis = buildAegisConfig(ofs3.session.modelPreferences, protocol)
+    ofs3.session.aegisConfig = copyTable(aegis)
 
     if protocol == "sport" then
         map.aileron = 0
         map.elevator = 1
         map.collective = 5
         map.rudder = 3
-        map.arm = 7
+        map.arm = aegis.armChannel - 1
         map.throttle = 2
         map.mode = 6
         map.headspeed = 6
@@ -300,7 +345,7 @@ local function initializeRxMap(protocol)
         map.elevator = 1
         map.collective = 2
         map.rudder = 3
-        map.arm = 4
+        map.arm = aegis.armChannel - 1
         map.throttle = 5
         map.mode = 6
         map.headspeed = 7
@@ -417,14 +462,19 @@ end
 local function determineFlightMode()
     local rpm = telemetry.getSensor("rpm") or 0
     local armed = telemetry.getSensor("armed")
-    local inFlight = armed == 0 and rpm > 1000
+    local isArmed = armed == 0
 
-    if inFlight then
+    if isArmed and rpm > 1000 then
         hasBeenInFlight = true
         return "inflight"
     end
 
+    -- Keep the live flight screen through throttle hold or autorotation.
+    -- Only an explicit disarm may end a flight and open the debrief screen.
     if hasBeenInFlight then
+        if isArmed then
+            return "inflight"
+        end
         return "postflight"
     end
 
