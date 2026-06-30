@@ -54,10 +54,11 @@ local function wakeup(box, telemetry)
     return cache
 end
 
-local function drawReportCard(x, y, w, h, title, value, accent, percent)
-    common.drawPanel(x, y, w, h, accent, title)
-    common.drawTextAligned(x + 12, y + 28, w - 24, value, "FONT_L", C.white, "left")
-    common.drawProgress(x + 12, y + h - 19, w - 24, 7, percent or 0, accent)
+local function drawReportCard(x, y, w, h, title, value, accent, percent, compact)
+    common.drawPanel(x, y, w, h, accent, nil)
+    common.drawTextAligned(x + 10, y + (compact and 4 or 7), w - 20, title, compact and "FONT_XXS" or "FONT_XS", C.muted, "left")
+    common.drawTextAligned(x + 10, y + (compact and 19 or 28), w - 20, value, compact and "FONT_S" or "FONT_L", C.white, "left")
+    common.drawProgress(x + 10, y + h - (compact and 10 or 19), w - 20, compact and 5 or 7, percent or 0, accent)
 end
 
 local function paint(x, y, w, h, box, cache)
@@ -65,22 +66,23 @@ local function paint(x, y, w, h, box, cache)
     lcd.color(C.bg)
     lcd.drawFilledRectangle(floor(x), floor(y), floor(w), floor(h))
 
-    local pad = 12
-    common.drawTextAligned(x + pad, y + 8, w * 0.5, "AEGIS // DEBRIEF", "FONT_STD", C.cyan, "left")
-    common.drawTextAligned(x + w - 240, y + 6, 228, cache.grade or "NOMINAL", "FONT_L", cache.gradeColor or C.green, "right")
+    local compact = h < 360
+    local pad = compact and 10 or 12
+    common.drawTextAligned(x + pad, y + (compact and 6 or 8), w * 0.5, "AEGIS // DEBRIEF", compact and "FONT_S" or "FONT_STD", C.cyan, "left")
+    common.drawTextAligned(x + w - 240, y + (compact and 4 or 6), 228, cache.grade or "NOMINAL", compact and "FONT_S" or "FONT_L", cache.gradeColor or C.green, "right")
 
-    local summaryY = y + 42
-    local summaryH = 62
+    local summaryY = y + (compact and 36 or 42)
+    local summaryH = compact and 52 or 62
     common.drawPanel(x + pad, summaryY, w - pad * 2, summaryH, cache.gradeColor or C.green, nil)
-    common.drawTextAligned(x + pad + 16, summaryY + 10, w * 0.5, cache.gradeSub or "FLIGHT DATA WITHIN LIMITS", "FONT_S", C.white, "left")
-    common.drawTextAligned(x + w - 220, summaryY + 8, 190, cache.time or "00:00", "FONT_XL", C.white, "right")
-    common.drawTextAligned(x + w - 220, summaryY + 39, 190, "FLIGHT TIME", "FONT_XXS", C.muted, "right")
+    common.drawTextAligned(x + pad + 16, summaryY + (compact and 8 or 10), w * 0.58, cache.gradeSub or "FLIGHT DATA WITHIN LIMITS", compact and "FONT_XS" or "FONT_S", C.white, "left")
+    common.drawTextAligned(x + w - 220, summaryY + (compact and 4 or 8), 190, cache.time or "00:00", compact and "FONT_L" or "FONT_XL", C.white, "right")
+    common.drawTextAligned(x + w - 220, summaryY + (compact and 31 or 39), 190, "FLIGHT TIME", "FONT_XXS", C.muted, "right")
 
-    local gridY = summaryY + summaryH + pad
+    local gap = compact and 6 or 10
+    local gridY = summaryY + summaryH + gap
     local gridH = h - (gridY - y) - pad
     local cols = 3
     local rows = 3
-    local gap = 10
     local cardW = floor((w - pad * 2 - gap * (cols - 1)) / cols)
     local cardH = floor((gridH - gap * (rows - 1)) / rows)
 
@@ -109,7 +111,7 @@ local function paint(x, y, w, h, box, cache)
         local card = cards[index]
         local cardX = x + pad + col * (cardW + gap)
         local cardY = gridY + row * (cardH + gap)
-        drawReportCard(cardX, cardY, cardW, cardH, card[1], card[2], card[3], card[4])
+        drawReportCard(cardX, cardY, cardW, cardH, card[1], card[2], card[3], card[4], compact)
     end
 end
 
