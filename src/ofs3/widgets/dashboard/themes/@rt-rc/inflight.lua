@@ -7,8 +7,6 @@ local min = math.min
 local max = math.max
 
 local common = assert(loadfile("SCRIPTS:/" .. ofs3.config.baseDir .. "/widgets/dashboard/themes/@rt-rc/common.lua"))()
-local stateManager = assert(loadfile("SCRIPTS:/" .. ofs3.config.baseDir .. "/widgets/dashboard/themes/@rt-rc/state.lua"))()
-stateManager.install(common)
 local C = common.C
 
 local layout = {cols = 12, rows = 12, padding = 0}
