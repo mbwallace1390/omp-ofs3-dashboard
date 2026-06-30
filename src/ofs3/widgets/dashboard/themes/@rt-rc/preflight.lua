@@ -7,8 +7,6 @@ local max = math.max
 local tostring = tostring
 
 local common = assert(loadfile("SCRIPTS:/" .. ofs3.config.baseDir .. "/widgets/dashboard/themes/@rt-rc/common.lua"))()
-local stateManager = assert(loadfile("SCRIPTS:/" .. ofs3.config.baseDir .. "/widgets/dashboard/themes/@rt-rc/state.lua"))()
-stateManager.install(common)
 local C = common.C
 
 local layout = {cols = 12, rows = 12, padding = 0}
@@ -24,7 +22,6 @@ local function wakeup(box, telemetry)
     cache.profile = common.sensor(telemetry, "profile")
     cache.voltage = common.sensor(telemetry, "voltage")
     cache.state, cache.stateColor, cache.isArmed = common.flightState(telemetry)
-    cache.diagnostics = stateManager.diagnosticText()
 
     local available, faults, warnings = 0, 0, 0
     local issues = {}
@@ -114,12 +111,11 @@ local function paint(x, y, w, h, box, cache)
     local setupY = bodyY + cardH + pad
     common.drawPanel(rightX, setupY, sideW, cardH, C.violet, "FLIGHT SETUP")
     local rowStart = setupY + (compact and 31 or 42)
-    local usableRows = max(54, cardH - (compact and 55 or 59))
+    local usableRows = max(54, cardH - (compact and 39 or 43))
     local rowStep = compact and floor(usableRows / 3) or 36
     drawCheckRow(rightX + 14, rowStart, sideW - 28, "PROFILE", common.formatValue(cache.profile, 0, ""), C.violet, compact)
     drawCheckRow(rightX + 14, rowStart + rowStep, sideW - 28, "PACK", common.formatValue(cache.voltage, 1, " V"), packColor, compact)
     drawCheckRow(rightX + 14, rowStart + rowStep * 2, sideW - 28, "STATE", cache.state or "--", cache.stateColor or C.muted, compact)
-    common.drawTextAligned(rightX + 10, setupY + cardH - 18, sideW - 20, cache.diagnostics or "IDLE A:-- T:-- R:0", "FONT_XXS", C.muted, "center")
 end
 
 local boxes = {{col=1,row=1,colspan=12,rowspan=12,type="func",subtype="func",wakeup=wakeup,paint=paint,bgcolor="transparent"}}
