@@ -20,10 +20,25 @@ local function addLine(parent, label)
     return form.addLine(label)
 end
 
+local function publishArmSettings(widget)
+    ofs3.session = ofs3.session or {}
+    ofs3.session.aegisArmSource = widget.aegisArmSource
+    ofs3.session.aegisArmReversed = widget.aegisArmReversed == true or tonumber(widget.aegisArmReversed) == 1
+end
+
 local function loadAegisSettings(widget, prefs)
     local section = prefs and prefs["system/aegis"] or {}
-    widget.aegisArmChannel = clamp(math.floor(tonumber(section.armChannel) or 0), 0, 24)
-    widget.aegisArmReversed = clamp(math.floor(tonumber(section.armReversed) or 0), 0, 1)
+
+    widget.aegisArmReversed = tonumber(section.armReversed) == 1
+
+    -- Ethos can persist Source objects directly through widget storage. This
+    -- lets Aegis follow a physical switch, logical switch, function source, or
+    -- channel selected by the user instead of guessing an output channel.
+    if storage and storage.read then
+        widget.aegisArmSource = storage.read("aegisArmSource")
+    end
+
+    publishArmSettings(widget)
 end
 
 local function ensureWidgetDefaults(widget)
@@ -42,11 +57,16 @@ function configui.write(widget)
     local _, prefs, prefFile = ofs3.runtime.readWidgetSettings(widget)
     prefs = prefs or {}
     prefs["system/aegis"] = prefs["system/aegis"] or {}
-    prefs["system/aegis"].armChannel = clamp(math.floor(tonumber(widget.aegisArmChannel) or 0), 0, 24)
-    prefs["system/aegis"].armReversed = clamp(math.floor(tonumber(widget.aegisArmReversed) or 0), 0, 1)
+    prefs["system/aegis"].armReversed = widget.aegisArmReversed and 1 or 0
 
     ofs3.ini.save_ini_file(prefFile, prefs)
     ofs3.session.modelPreferences = prefs
+
+    if storage and storage.write then
+        storage.write("aegisArmSource", widget.aegisArmSource)
+    end
+
+    publishArmSettings(widget)
     return true
 end
 
@@ -69,19 +89,20 @@ function configui.configure(widget)
     end)
     if capacityField and capacityField.suffix then capacityField:suffix("mAh") end
 
-    local armChannelLine = addLine(nil, "Aegis arm output channel (0 = protocol default)")
-    local armChannelField = form.addNumberField(armChannelLine, nil, 0, 24, function()
-        return math.floor(tonumber(widget.aegisArmChannel) or 0)
+    local armSourceLine = addLine(nil, "Aegis arm switch / source")
+    form.addSourceField(armSourceLine, nil, function()
+        return widget.aegisArmSource
     end, function(value)
-        widget.aegisArmChannel = clamp(math.floor(tonumber(value) or 0), 0, 24)
+        widget.aegisArmSource = value
+        publishArmSettings(widget)
     end)
-    if armChannelField and armChannelField.suffix then armChannelField:suffix("CH") end
 
-    local armReversedLine = addLine(nil, "Aegis arm reversed (0 = no, 1 = yes)")
-    form.addNumberField(armReversedLine, nil, 0, 1, function()
-        return math.floor(tonumber(widget.aegisArmReversed) or 0)
+    local armReversedLine = addLine(nil, "Reverse selected arm source")
+    form.addBooleanField(armReversedLine, nil, function()
+        return widget.aegisArmReversed == true
     end, function(value)
-        widget.aegisArmReversed = clamp(math.floor(tonumber(value) or 0), 0, 1)
+        widget.aegisArmReversed = value == true
+        publishArmSettings(widget)
     end)
 end
 
