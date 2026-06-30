@@ -19,6 +19,7 @@ local lastWakeupTime = 0
 local simSensorList = nil
 local CRSF_RPM_MAXIMUM = 65000
 local CRSF_PROVISION_INTERVAL = 1
+local ARMED_RPM_MINIMUM = 250
 local crsfStartupProvision = {
     protocol = nil,
     lipoHandled = false,
@@ -230,6 +231,14 @@ local function updateSimulationSensors(rootSource)
 end
 
 local function deriveArmedValue()
+    -- Rotor RPM is the most reliable proof that the model is armed and
+    -- running. Check it before the protocol-specific arm channel so a missing
+    -- or differently mapped arm mirror cannot keep the dashboard in preflight.
+    local rpm = ofs3.tasks.telemetry.getSensor("rpm") or 0
+    if rpm > ARMED_RPM_MINIMUM then
+        return 0
+    end
+
     local rx = ofs3.session and ofs3.session.rx and ofs3.session.rx.values or nil
     local value = rx and rx.arm or nil
     if value ~= nil then
@@ -239,10 +248,6 @@ local function deriveArmedValue()
         return 1
     end
 
-    local rpm = ofs3.tasks.telemetry.getSensor("rpm") or 0
-    if rpm > 1000 then
-        return 0
-    end
     return 1
 end
 
