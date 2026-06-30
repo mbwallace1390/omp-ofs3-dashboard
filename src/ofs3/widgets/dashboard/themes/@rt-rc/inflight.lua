@@ -1,257 +1,150 @@
---[[
-  Copyright (C) 2025 Rob Thomson
-  GPLv3 — https://www.gnu.org/licenses/gpl-3.0.en.html
-]] --
-
+--[[ Aegis OFS3 inflight dashboard - GPLv3 ]] --
 local ofs3 = require("ofs3")
+local lcd = lcd
+local math = math
+local floor = math.floor
+local min = math.min
+local max = math.max
 
-local utils = ofs3.widgets.dashboard.utils
-local boxes_cache = nil
-local themeconfig = nil
-local lastScreenW = nil
+local common = assert(loadfile("SCRIPTS:/" .. ofs3.config.baseDir .. "/widgets/dashboard/themes/@rt-rc/common.lua"))()
+local C = common.C
 
-local function getUserVoltageOverride(which)
-    local prefs = ofs3.session and ofs3.session.modelPreferences
-    if prefs and prefs["system/@default"] then
-        local v = tonumber(prefs["system/@default"][which])
+local layout = {cols = 12, rows = 12, padding = 0}
+local header_layout = common.headerLayout()
+local header_boxes = common.headerBoxes()
 
-        if which == "v_min" and v and math.abs(v - 18.0) > 0.05 then return v end
-        if which == "v_max" and v and math.abs(v - 25.2) > 0.05 then return v end
-    end
-    return nil
+local function wakeup(box, telemetry)
+    local cache = box._cache or {maxRpm = 0}
+    box._cache = cache
+
+    cache.rpm = common.sensor(telemetry, "rpm") or 0
+    cache.maxRpm = max(cache.maxRpm or 0, cache.rpm)
+    cache.throttle = common.throttlePercent()
+    cache.esc = common.sensor(telemetry, "temp_esc")
+    cache.fuel = common.sensor(telemetry, "smartfuel")
+    cache.current = common.sensor(telemetry, "current")
+    cache.voltage = common.sensor(telemetry, "voltage")
+    cache.link = common.sensor(telemetry, "rssi")
+    cache.consumed = common.sensor(telemetry, "consumption")
+    cache.state, cache.stateColor = common.flightState(telemetry)
+    cache.timer = common.flightTimeText()
+    return cache
 end
 
-local colorMode = utils.themeColors()
-
-local theme_section = "system/@default"
-
-local THEME_DEFAULTS = {rpm_min = 0, rpm_max = 3000, bec_min = 3.0, bec_max = 13.0, esctemp_warn = 90, esctemp_max = 140, tx_min = 7.2, tx_warn = 7.4, tx_max = 8.4}
-local DEFAULT_THEME_OPTION_KEY = "ls_full"
-local themeOptionKeysByWidth = {[800] = "ls_full", [784] = "ls_std", [640] = "ss_full", [630] = "ss_std", [480] = "ms_full", [472] = "ms_std"}
-local supportedThemeWidths = {800, 784, 640, 630, 480, 472}
-
-local function getThemeOptionKey(W)
-    W = tonumber(W)
-    if W == nil and system.getVersion then
-        local version = system.getVersion() or {}
-        W = tonumber(version.lcdWidth)
+local function drawRadialGauge(cx, cy, radius, value, maximum, color)
+    local startAngle = 140
+    local sweep = 260
+    local ticks = 32
+    local percent = maximum > 0 and common.clamp(value / maximum, 0, 1) or 0
+    local active = floor(ticks * percent + 0.5)
+    for index = 0, ticks - 1 do
+        local angle = math.rad(startAngle + sweep * index / (ticks - 1))
+        local inner = radius - 14
+        local x1 = cx + math.cos(angle) * inner
+        local y1 = cy + math.sin(angle) * inner
+        local x2 = cx + math.cos(angle) * radius
+        local y2 = cy + math.sin(angle) * radius
+        lcd.color(index < active and color or C.line)
+        lcd.drawLine(floor(x1), floor(y1), floor(x2), floor(y2))
     end
-    W = W or 800
-
-    local closestW, closestDistance
-    for _, candidate in ipairs(supportedThemeWidths) do
-        local distance = math.abs(W - candidate)
-        if closestDistance == nil or distance < closestDistance then
-            closestW = candidate
-            closestDistance = distance
-        end
-    end
-
-    return themeOptionKeysByWidth[closestW] or DEFAULT_THEME_OPTION_KEY
+    lcd.color(C.line2)
+    lcd.drawLine(floor(cx - radius * 0.68), floor(cy + radius * 0.72), floor(cx + radius * 0.68), floor(cy + radius * 0.72))
 end
 
-local themeOptions = {
+local function drawVerticalMeter(x, y, w, h, title, value, maximum, color, unit)
+    common.drawPanel(x, y, w, h, color, title)
+    local barX = x + 15
+    local barY = y + 34
+    local barW = 14
+    local barH = h - 52
+    local percent = value and maximum > 0 and common.clamp(value / maximum, 0, 1) or 0
+    lcd.color(C.line)
+    lcd.drawRectangle(floor(barX), floor(barY), floor(barW), floor(barH), 1)
+    if percent > 0 then
+        local fillHeight = floor((barH - 4) * percent)
+        lcd.color(color)
+        lcd.drawFilledRectangle(floor(barX + 2), floor(barY + barH - 2 - fillHeight), floor(barW - 4), fillHeight)
+    end
+    common.drawTextAligned(x + 38, y + 44, w - 50, common.formatValue(value, 0, unit), "FONT_L", C.white, "left")
+end
 
-    ls_full = {font = "FONT_XXL", advfont = "FONT_STD", thickness = 35, batteryframethickness = 4, titlepaddingbottom = 15, valuepaddingleft = 25, valuepaddingtop = 20, valuepaddingbottom = 25, gaugepaddingtop = 20, gaugepadding = 20},
+local function paint(x, y, w, h, box, cache)
+    cache = cache or box._cache or {}
+    lcd.color(C.bg)
+    lcd.drawFilledRectangle(floor(x), floor(y), floor(w), floor(h))
 
-    ls_std = {font = "FONT_XL", advfont = "FONT_STD", thickness = 35, batteryframethickness = 4, titlepaddingbottom = 0, valuepaddingleft = 75, valuepaddingtop = 5, valuepaddingbottom = 25, gaugepaddingtop = 5, gaugepadding = 10},
+    local pad = 12
+    common.drawTextAligned(x + pad, y + 8, w * 0.5, "AEGIS // FLIGHT", "FONT_STD", C.cyan, "left")
+    common.drawTextAligned(x + w * 0.35, y + 3, w * 0.30, cache.timer or "00:00", "FONT_XL", C.white, "center")
 
-    ms_full = {font = "FONT_XXL", advfont = "FONT_STD", thickness = 27, batteryframethickness = 4, titlepaddingbottom = 0, valuepaddingleft = 20, valuepaddingtop = 5, valuepaddingbottom = 15, gaugepaddingtop = 5, gaugepadding = 10},
+    local bodyY = y + 42
+    local bodyH = h - 54
+    local leftW = floor(w * 0.18)
+    local rightW = floor(w * 0.24)
+    local centerX = x + pad + leftW + pad
+    local centerW = w - leftW - rightW - pad * 4
+    local leftX = x + pad
+    local rightX = centerX + centerW + pad
 
-    ms_std = {font = "FONT_XL", advfont = "FONT_S", thickness = 20, batteryframethickness = 2, titlepaddingbottom = 0, valuepaddingleft = 20, valuepaddingtop = 10, valuepaddingbottom = 25, gaugepaddingtop = 5, gaugepadding = 5},
+    local escColor = common.escColor(cache.esc)
+    local throttleColor = (cache.throttle or 0) >= 90 and C.amber or C.cyan
+    local fuelColor = common.fuelColor(cache.fuel)
+    local packColor = common.packColor(cache.voltage)
+    local linkColor = common.linkColor(cache.link)
 
-    ss_full = {font = "FONT_XL", advfont = "FONT_STD", thickness = 25, batteryframethickness = 4, titlepaddingbottom = 0, valuepaddingleft = 20, valuepaddingtop = 5, valuepaddingbottom = 15, gaugepaddingtop = 5, gaugepadding = 10},
+    local halfH = floor((bodyH - pad) / 2)
+    drawVerticalMeter(leftX, bodyY, leftW, halfH, "ESC TEMP", cache.esc, common.getConfig("esc_max"), escColor, "°")
+    drawVerticalMeter(leftX, bodyY + halfH + pad, leftW, halfH, "THROTTLE", cache.throttle, 100, throttleColor, "%")
 
-    ss_std = {font = "FONT_XL", advfont = "FONT_S", thickness = 22, batteryframethickness = 2, titlepaddingbottom = 0, valuepaddingleft = 20, valuepaddingtop = 10, valuepaddingbottom = 25, gaugepaddingtop = 5, gaugepadding = 10}
+    common.drawPanel(centerX, bodyY, centerW, bodyH, C.cyan, nil)
+    local cx = centerX + centerW / 2
+    local cy = bodyY + bodyH * 0.48
+    local radius = min(centerW * 0.43, bodyH * 0.43)
+    local rpmMax = common.getConfig("rpm_max")
+    local rpmColor = (cache.rpm or 0) > rpmMax and C.red or C.cyan
+    drawRadialGauge(cx, cy, radius, cache.rpm or 0, rpmMax, rpmColor)
+    common.drawTextAligned(centerX, cy - 44, centerW, common.formatValue(cache.rpm, 0, ""), "FONT_XXL", C.white, "center")
+    common.drawTextAligned(centerX, cy + 10, centerW, "HEADSPEED  RPM", "FONT_XS", C.muted, "center")
+    common.drawTextAligned(centerX + 22, bodyY + bodyH - 33, centerW - 44, "MAX " .. common.formatValue(cache.maxRpm, 0, " RPM"), "FONT_XS", C.amber, "left")
+    common.drawTextAligned(centerX + 22, bodyY + bodyH - 33, centerW - 44, "LIMIT " .. common.formatValue(rpmMax, 0, " RPM"), "FONT_XS", C.muted, "right")
+
+    local fuelH = floor(bodyH * 0.34)
+    common.drawPanel(rightX, bodyY, rightW, fuelH, fuelColor, "SMART FUEL")
+    common.drawTextAligned(rightX + 12, bodyY + 34, rightW - 24, common.formatValue(cache.fuel, 0, "%"), "FONT_XL", C.white, "right")
+    common.drawSegments(rightX + 12, bodyY + fuelH - 39, rightW - 32, 16, cache.fuel or 0, 10, fuelColor)
+    lcd.color(fuelColor)
+    lcd.drawFilledRectangle(floor(rightX + rightW - 16), floor(bodyY + fuelH - 35), 4, 8)
+
+    local stateGap = 8
+    local stateH = 28
+    local stateY = bodyY + fuelH + stateGap
+    common.drawStateBadge(rightX, stateY, rightW, stateH, cache.state, cache.stateColor)
+
+    local smallY = stateY + stateH + stateGap
+    local smallH = floor((bodyY + bodyH - smallY - pad) / 2)
+    common.drawMetric(rightX, smallY, rightW, smallH, "CURRENT LOAD", common.formatValue(cache.current, 1, " A"), C.violet, "instantaneous")
+    common.drawMetric(rightX, smallY + smallH + pad, rightW, smallH, "PACK / LINK", common.formatValue(cache.voltage, 1, " V") .. "   " .. common.formatValue(cache.link, 0, "%"), packColor == C.red and C.red or linkColor, "power and RF health")
+
+    local throttleY = bodyY + halfH + pad
+    local consumedX = leftX + 38
+    local consumedW = leftW - 50
+    local consumedLabelY = throttleY + halfH - 64
+    common.drawTextAligned(consumedX, consumedLabelY, consumedW, "CONSUMED", "FONT_XXS", C.muted, "center")
+    common.drawTextAligned(consumedX, consumedLabelY + 18, consumedW, common.formatValue(cache.consumed, 0, " mAh"), "FONT_XS", C.white, "center")
+
+    common.drawTextAligned(x + w * 0.67, y + h - 22, w * 0.31 - pad, "AEGIS MONITORING", "FONT_XXS", C.line2, "right")
+end
+
+local boxes = {{
+    col = 1, row = 1, colspan = 12, rowspan = 12,
+    type = "func", subtype = "func",
+    wakeup = wakeup, paint = paint, bgcolor = "transparent"
+}}
+
+return {
+    layout = layout,
+    boxes = boxes,
+    header_boxes = header_boxes,
+    header_layout = header_layout,
+    scheduler = {spread_scheduling = true, spread_scheduling_paint = false, spread_ratio = 0.85}
 }
-
-local function getThemeValue(key)
-    if ofs3 and ofs3.session and ofs3.session.modelPreferences and ofs3.session.modelPreferences[theme_section] then
-        local val = ofs3.session.modelPreferences[theme_section][key]
-        val = tonumber(val)
-        if val ~= nil then return val end
-    end
-    return THEME_DEFAULTS[key]
-end
-
-local lastScreenW = nil
-local boxes_cache = nil
-local themeconfig = nil
-local headeropts = utils.getHeaderOptions()
-
-local layout = {cols = 4, rows = 14, padding = 1}
-
-local header_layout = {height = headeropts.height, cols = 7, rows = 1, padding = 0}
-
-local function buildBoxes(W)
-
-    local opts = themeOptions[getThemeOptionKey(W)] or themeOptions[DEFAULT_THEME_OPTION_KEY]
-
-    return {
-
-        {
-            type = "gauge",
-            subtype = "arc",
-            col = 1,
-            row = 1,
-            rowspan = 12,
-            colspan = 2,
-            source = "voltage",
-            thickness = opts.thickness,
-            font = opts.font,
-            arcbgcolor = colorMode.arcbgcolor,
-            title = "@i18n(widgets.dashboard.theme_voltage)@",
-            titlepos = "bottom",
-            bgcolor = colorMode.bgcolor,
-            gaugepadding = opts.gaugepadding,
-            valuepaddingtop = opts.valuepaddingtop,
-            min = function()
-                local cfg = ofs3.session.batteryConfig
-                local cells = (cfg and cfg.batteryCellCount) or 3
-                local minV = (cfg and cfg.vbatmincellvoltage) or 3.0
-                return math.max(0, cells * minV)
-            end,
-
-            max = function()
-                local cfg = ofs3.session.batteryConfig
-                local cells = (cfg and cfg.batteryCellCount) or 3
-                local maxV = (cfg and cfg.vbatfullcellvoltage) or 4.2
-                return math.max(0, cells * maxV)
-            end,
-
-            thresholds = {
-                {
-                    value = function(box)
-
-                        local raw_gm = utils.getParam(box, "min")
-                        if type(raw_gm) == "function" then raw_gm = raw_gm(box) end
-
-                        local raw_gM = utils.getParam(box, "max")
-                        if type(raw_gM) == "function" then raw_gM = raw_gM(box) end
-
-                        return raw_gm + 0.30 * (raw_gM - raw_gm)
-                    end,
-                    fillcolor = colorMode.fillcritcolor,
-                    textcolor = colorMode.textcolor
-                }, {
-                    value = function(box)
-                        local raw_gm = utils.getParam(box, "min")
-                        if type(raw_gm) == "function" then raw_gm = raw_gm(box) end
-
-                        local raw_gM = utils.getParam(box, "max")
-                        if type(raw_gM) == "function" then raw_gM = raw_gM(box) end
-
-                        return raw_gm + 0.50 * (raw_gM - raw_gm)
-                    end,
-                    fillcolor = colorMode.fillwarncolor,
-                    textcolor = colorMode.textcolor
-                }, {
-                    value = function(box)
-                        local raw_gM = utils.getParam(box, "max")
-                        if type(raw_gM) == "function" then raw_gM = raw_gM(box) end
-
-                        return raw_gM
-                    end,
-                    fillcolor = colorMode.fillcolor,
-                    textcolor = colorMode.textcolor
-                }
-            }
-        }, {
-            type = "gauge",
-            subtype = "arc",
-            col = 3,
-            row = 1,
-            rowspan = 12,
-            thickness = opts.thickness,
-            colspan = 2,
-            source = "smartfuel",
-            transform = "floor",
-            min = 0,
-            max = 140,
-            font = opts.font,
-            arcbgcolor = colorMode.arcbgcolor,
-            title = "@i18n(widgets.dashboard.theme_fuel)@",
-            titlepos = "bottom",
-            bgcolor = colorMode.bgcolor,
-            titlecolor = colorMode.titlecolor,
-            textcolor = colorMode.titlecolor,
-            gaugepadding = opts.gaugepadding,
-            valuepaddingtop = opts.valuepaddingtop,
-            thresholds = {{value = 30, fillcolor = colorMode.fillcritcolor, textcolor = colorMode.textcolor}, {value = 50, fillcolor = colorMode.fillwarncolor, textcolor = colorMode.textcolor}, {value = 140, fillcolor = colorMode.fillcolor, textcolor = colorMode.textcolor}}
-        }, {col = 1, row = 13, rowspan = 2, type = "text", subtype = "telemetry", nosource = "-", source = "profile", transform = "floor", bgcolor = colorMode.bgcolor, titlecolor = colorMode.titlecolor, textcolor = colorMode.titlecolor},
-        {col = 4, row = 13, rowspan = 2, type = "time", subtype = "flight", bgcolor = colorMode.bgcolor, titlecolor = colorMode.titlecolor, textcolor = colorMode.titlecolor},
-        {col = 3, row = 13, rowspan = 2, type = "text", subtype = "telemetry", source = "rpm", nosource = "-", unit = "rpm", transform = "floor", bgcolor = colorMode.bgcolor, titlecolor = colorMode.titlecolor, textcolor = colorMode.titlecolor},
-        {col = 2, row = 13, rowspan = 2, type = "text", subtype = "telemetry", source = "rssi", nosource = "-", unit = "dB", transform = "floor", bgcolor = colorMode.bgcolor, titlecolor = colorMode.titlecolor, textcolor = colorMode.titlecolor}
-
-    }
-end
-
-local header_boxes = {
-
-    {col = 1, row = 1, colspan = 2, type = "text", subtype = "craftname", font = headeropts.font, valuealign = "left", valuepaddingleft = 5, bgcolor = colorMode.bgcolortop, titlecolor = colorMode.titlecolor, textcolor = colorMode.textcolor},
-
-    {col = 3, row = 1, colspan = 3, type = "image", subtype = "image", bgcolor = colorMode.bgcolortop}, {
-        col = 6,
-        row = 1,
-        type = "gauge",
-        subtype = "bar",
-        source = "txbatt",
-        font = headeropts.font,
-        battery = true,
-        batteryframe = true,
-        hidevalue = true,
-        valuealign = "left",
-        batterysegments = 4,
-        batteryspacing = 1,
-        batteryframethickness = 2,
-        batterysegmentpaddingtop = headeropts.batterysegmentpaddingtop,
-        batterysegmentpaddingbottom = headeropts.batterysegmentpaddingbottom,
-        batterysegmentpaddingleft = headeropts.batterysegmentpaddingleft,
-        batterysegmentpaddingright = headeropts.batterysegmentpaddingright,
-        gaugepaddingright = headeropts.gaugepaddingright,
-        gaugepaddingleft = headeropts.gaugepaddingleft,
-        gaugepaddingbottom = headeropts.gaugepaddingbottom,
-        gaugepaddingtop = headeropts.gaugepaddingtop,
-        fillbgcolor = colorMode.txbgfillcolor,
-        bgcolor = colorMode.bgcolortop,
-        accentcolor = colorMode.txaccentcolor,
-        textcolor = colorMode.textcolor,
-        min = getThemeValue("tx_min"),
-        max = getThemeValue("tx_max"),
-        thresholds = {{value = getThemeValue("tx_warn"), fillcolor = "orange"}, {value = getThemeValue("tx_max"), fillcolor = colorMode.txfillcolor}}
-    }, {
-        col = 7,
-        row = 1,
-        type = "gauge",
-        subtype = "step",
-        source = "rssi",
-        font = "FONT_XS",
-        stepgap = 2,
-        stepcount = 5,
-        decimals = 0,
-        valuealign = "left",
-        barpaddingleft = headeropts.barpaddingleft,
-        barpaddingright = headeropts.barpaddingright,
-        barpaddingbottom = headeropts.barpaddingbottom,
-        barpaddingtop = headeropts.barpaddingtop,
-        valuepaddingleft = headeropts.valuepaddingleft,
-        valuepaddingbottom = headeropts.valuepaddingbottom,
-        bgcolor = colorMode.bgcolortop,
-        textcolor = colorMode.textcolor,
-        fillcolor = colorMode.rssifillcolor,
-        fillbgcolor = colorMode.rssifillbgcolor
-    }
-}
-
-local function boxes()
-    local config = ofs3 and ofs3.session and ofs3.session.modelPreferences and ofs3.session.modelPreferences[theme_section]
-    local W = lcd.getWindowSize()
-    if boxes_cache == nil or themeconfig ~= config or lastScreenW ~= W then
-        boxes_cache = buildBoxes(W)
-        themeconfig = config
-        lastScreenW = W
-    end
-    return boxes_cache
-end
-
-return {layout = layout, boxes = boxes, header_boxes = header_boxes, header_layout = header_layout, scheduler = {spread_scheduling = true, spread_scheduling_paint = false, spread_ratio = 0.5}}
