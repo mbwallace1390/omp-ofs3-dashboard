@@ -51,12 +51,12 @@ local function drawRadialGauge(cx, cy, radius, value, maximum, color)
     lcd.drawLine(floor(cx - radius * 0.68), floor(cy + radius * 0.72), floor(cx + radius * 0.68), floor(cy + radius * 0.72))
 end
 
-local function drawVerticalMeter(x, y, w, h, title, value, maximum, color, unit)
+local function drawVerticalMeter(x, y, w, h, title, value, maximum, color, unit, compact)
     common.drawPanel(x, y, w, h, color, title)
     local barX = x + 15
-    local barY = y + 34
+    local barY = y + (compact and 30 or 34)
     local barW = 14
-    local barH = h - 52
+    local barH = h - (compact and 44 or 52)
     local percent = value and maximum > 0 and common.clamp(value / maximum, 0, 1) or 0
     lcd.color(C.line)
     lcd.drawRectangle(floor(barX), floor(barY), floor(barW), floor(barH), 1)
@@ -65,7 +65,19 @@ local function drawVerticalMeter(x, y, w, h, title, value, maximum, color, unit)
         lcd.color(color)
         lcd.drawFilledRectangle(floor(barX + 2), floor(barY + barH - 2 - fillHeight), floor(barW - 4), fillHeight)
     end
-    common.drawTextAligned(x + 38, y + 44, w - 50, common.formatValue(value, 0, unit), "FONT_L", C.white, "left")
+    common.drawTextAligned(x + 38, y + (compact and 36 or 44), w - 50, common.formatValue(value, 0, unit), compact and "FONT_S" or "FONT_L", C.white, "left")
+end
+
+local function drawCompactMetric(x, y, w, h, title, valueText, accent, subtitle)
+    common.drawPanel(x, y, w, h, accent, title)
+    if h < 70 then
+        common.drawTextAligned(x + 12, y + 23, w - 24, valueText, "FONT_S", C.white, "left")
+    else
+        common.drawTextAligned(x + 12, y + 26, w - 24, valueText, "FONT_L", C.white, "left")
+        if subtitle then
+            common.drawTextAligned(x + 12, y + h - 22, w - 24, subtitle, "FONT_XXS", C.muted, "left")
+        end
+    end
 end
 
 local function paint(x, y, w, h, box, cache)
@@ -73,12 +85,13 @@ local function paint(x, y, w, h, box, cache)
     lcd.color(C.bg)
     lcd.drawFilledRectangle(floor(x), floor(y), floor(w), floor(h))
 
-    local pad = 12
-    common.drawTextAligned(x + pad, y + 8, w * 0.5, "AEGIS // FLIGHT", "FONT_STD", C.cyan, "left")
-    common.drawTextAligned(x + w * 0.35, y + 3, w * 0.30, cache.timer or "00:00", "FONT_XL", C.white, "center")
+    local compact = h < 360
+    local pad = compact and 10 or 12
+    common.drawTextAligned(x + pad, y + (compact and 6 or 8), w * 0.5, "AEGIS // FLIGHT", compact and "FONT_S" or "FONT_STD", C.cyan, "left")
+    common.drawTextAligned(x + w * 0.35, y + (compact and 1 or 3), w * 0.30, cache.timer or "00:00", compact and "FONT_L" or "FONT_XL", C.white, "center")
 
-    local bodyY = y + 42
-    local bodyH = h - 54
+    local bodyY = y + (compact and 38 or 42)
+    local bodyH = h - (compact and 48 or 54)
     local leftW = floor(w * 0.18)
     local rightW = floor(w * 0.24)
     local centerX = x + pad + leftW + pad
@@ -93,46 +106,48 @@ local function paint(x, y, w, h, box, cache)
     local linkColor = common.linkColor(cache.link)
 
     local halfH = floor((bodyH - pad) / 2)
-    drawVerticalMeter(leftX, bodyY, leftW, halfH, "ESC TEMP", cache.esc, common.getConfig("esc_max"), escColor, "°")
-    drawVerticalMeter(leftX, bodyY + halfH + pad, leftW, halfH, "THROTTLE", cache.throttle, 100, throttleColor, "%")
+    drawVerticalMeter(leftX, bodyY, leftW, halfH, "ESC TEMP", cache.esc, common.getConfig("esc_max"), escColor, "°", compact)
+    drawVerticalMeter(leftX, bodyY + halfH + pad, leftW, halfH, "THROTTLE", cache.throttle, 100, throttleColor, "%", compact)
 
     common.drawPanel(centerX, bodyY, centerW, bodyH, C.cyan, nil)
     local cx = centerX + centerW / 2
-    local cy = bodyY + bodyH * 0.48
-    local radius = min(centerW * 0.43, bodyH * 0.43)
+    local cy = bodyY + bodyH * (compact and 0.45 or 0.48)
+    local radius = min(centerW * (compact and 0.37 or 0.43), bodyH * (compact and 0.36 or 0.43))
     local rpmMax = common.getConfig("rpm_max")
     local rpmColor = (cache.rpm or 0) > rpmMax and C.red or C.cyan
     drawRadialGauge(cx, cy, radius, cache.rpm or 0, rpmMax, rpmColor)
-    common.drawTextAligned(centerX, cy - 44, centerW, common.formatValue(cache.rpm, 0, ""), "FONT_XXL", C.white, "center")
-    common.drawTextAligned(centerX, cy + 10, centerW, "HEADSPEED  RPM", "FONT_XS", C.muted, "center")
-    common.drawTextAligned(centerX + 22, bodyY + bodyH - 33, centerW - 44, "MAX " .. common.formatValue(cache.maxRpm, 0, " RPM"), "FONT_XS", C.amber, "left")
-    common.drawTextAligned(centerX + 22, bodyY + bodyH - 33, centerW - 44, "LIMIT " .. common.formatValue(rpmMax, 0, " RPM"), "FONT_XS", C.muted, "right")
+    common.drawTextAligned(centerX, cy - (compact and 32 or 44), centerW, common.formatValue(cache.rpm, 0, ""), compact and "FONT_XL" or "FONT_XXL", C.white, "center")
+    common.drawTextAligned(centerX, cy + (compact and 5 or 10), centerW, "HEADSPEED  RPM", "FONT_XS", C.muted, "center")
+    common.drawTextAligned(centerX + 18, bodyY + bodyH - (compact and 27 or 33), centerW - 36, "MAX " .. common.formatValue(cache.maxRpm, 0, " RPM"), "FONT_XXS", C.amber, "left")
+    common.drawTextAligned(centerX + 18, bodyY + bodyH - (compact and 27 or 33), centerW - 36, "LIMIT " .. common.formatValue(rpmMax, 0, " RPM"), "FONT_XXS", C.muted, "right")
 
-    local fuelH = floor(bodyH * 0.34)
+    local fuelH = floor(bodyH * (compact and 0.32 or 0.34))
     common.drawPanel(rightX, bodyY, rightW, fuelH, fuelColor, "SMART FUEL")
-    common.drawTextAligned(rightX + 12, bodyY + 34, rightW - 24, common.formatValue(cache.fuel, 0, "%"), "FONT_XL", C.white, "right")
-    common.drawSegments(rightX + 12, bodyY + fuelH - 39, rightW - 32, 16, cache.fuel or 0, 10, fuelColor)
+    common.drawTextAligned(rightX + 12, bodyY + (compact and 29 or 34), rightW - 24, common.formatValue(cache.fuel, 0, "%"), compact and "FONT_L" or "FONT_XL", C.white, "right")
+    common.drawSegments(rightX + 12, bodyY + fuelH - (compact and 31 or 39), rightW - 32, compact and 13 or 16, cache.fuel or 0, compact and 8 or 10, fuelColor)
     lcd.color(fuelColor)
-    lcd.drawFilledRectangle(floor(rightX + rightW - 16), floor(bodyY + fuelH - 35), 4, 8)
+    lcd.drawFilledRectangle(floor(rightX + rightW - 16), floor(bodyY + fuelH - (compact and 28 or 35)), 4, 8)
 
-    local stateGap = 8
-    local stateH = 28
+    local stateGap = compact and 6 or 8
+    local stateH = compact and 25 or 28
     local stateY = bodyY + fuelH + stateGap
     common.drawStateBadge(rightX, stateY, rightW, stateH, cache.state, cache.stateColor)
 
     local smallY = stateY + stateH + stateGap
     local smallH = floor((bodyY + bodyH - smallY - pad) / 2)
-    common.drawMetric(rightX, smallY, rightW, smallH, "CURRENT LOAD", common.formatValue(cache.current, 1, " A"), C.violet, "instantaneous")
-    common.drawMetric(rightX, smallY + smallH + pad, rightW, smallH, "PACK / LINK", common.formatValue(cache.voltage, 1, " V") .. "   " .. common.formatValue(cache.link, 0, "%"), packColor == C.red and C.red or linkColor, "power and RF health")
+    drawCompactMetric(rightX, smallY, rightW, smallH, "CURRENT LOAD", common.formatValue(cache.current, 1, " A"), C.violet, "instantaneous")
+    drawCompactMetric(rightX, smallY + smallH + pad, rightW, smallH, "PACK / LINK", common.formatValue(cache.voltage, 1, " V") .. "   " .. common.formatValue(cache.link, 0, "%"), packColor == C.red and C.red or linkColor, "power and RF health")
 
     local throttleY = bodyY + halfH + pad
     local consumedX = leftX + 38
     local consumedW = leftW - 50
-    local consumedLabelY = throttleY + halfH - 64
+    local consumedLabelY = throttleY + halfH - (compact and 53 or 64)
     common.drawTextAligned(consumedX, consumedLabelY, consumedW, "CONSUMED", "FONT_XXS", C.muted, "center")
-    common.drawTextAligned(consumedX, consumedLabelY + 18, consumedW, common.formatValue(cache.consumed, 0, " mAh"), "FONT_XS", C.white, "center")
+    common.drawTextAligned(consumedX, consumedLabelY + 16, consumedW, common.formatValue(cache.consumed, 0, " mAh"), "FONT_XS", C.white, "center")
 
-    common.drawTextAligned(x + w * 0.67, y + h - 22, w * 0.31 - pad, "AEGIS MONITORING", "FONT_XXS", C.line2, "right")
+    if not compact then
+        common.drawTextAligned(x + w * 0.67, y + h - 22, w * 0.31 - pad, "AEGIS MONITORING", "FONT_XXS", C.line2, "right")
+    end
 end
 
 local boxes = {{
