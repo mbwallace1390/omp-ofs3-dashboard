@@ -31,6 +31,8 @@ This test branch replaces the active `@rt-rc` screen modules with Aegis while le
 
 The screens switch to a compact layout whenever the widget height is below 360 pixels. Compact mode reduces the center graphics, derives row spacing from each card's actual height and simplifies small telemetry cards so text cannot overlap at 784x294.
 
+The first physical-radio screenshot exposed overlap between the preflight status hex, Smart Fuel area and the final Flight Setup row. That revision is fixed on this branch, and the same compact-height treatment has been applied proactively to the inflight and postflight screens.
+
 Changing an Ethos screen template can remove the widget assignment from that screen. After selecting a different layout, assign the OFS3 Dashboard to the new zone again. If Ethos instead shows an unsupported-size or Lua error, record the exact message and the reported widget dimensions before changing the dashboard resolution table.
 
 ## Defaults
