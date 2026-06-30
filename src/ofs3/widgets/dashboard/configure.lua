@@ -21,9 +21,19 @@ local function addLine(parent, label)
 end
 
 local function publishArmSettings(widget)
+    local reversed = widget.aegisArmReversed == true or tonumber(widget.aegisArmReversed) == 1
+
+    -- Keep this outside ofs3.session because runtime model initialization
+    -- replaces the entire session table. The selected Source object must remain
+    -- available to the Aegis state manager after that reset.
+    ofs3.aegisArmConfig = {
+        source = widget.aegisArmSource,
+        reversed = reversed
+    }
+
     ofs3.session = ofs3.session or {}
     ofs3.session.aegisArmSource = widget.aegisArmSource
-    ofs3.session.aegisArmReversed = widget.aegisArmReversed == true or tonumber(widget.aegisArmReversed) == 1
+    ofs3.session.aegisArmReversed = reversed
 end
 
 local function loadAegisSettings(widget, prefs)
