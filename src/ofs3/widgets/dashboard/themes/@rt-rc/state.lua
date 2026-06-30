@@ -12,9 +12,6 @@ local tonumber, tostring, type = tonumber, tostring, type
 
 local ACTIVE_RPM = 250
 local THROTTLE_ACTIVE_PERCENT = 5
-local ARM_CHANGE_MINIMUM = 600
-local ARM_CANDIDATE_SECONDS = 12
-local MAX_CHANNELS = 24
 local STATS_INTERVAL = 0.25
 local trackedStats = {"rssi", "voltage", "rpm", "current", "temp_esc", "consumption", "smartfuel"}
 
@@ -25,16 +22,8 @@ local state = {
     timerStart = nil,
     timerBase = 0,
     lastStatsAt = 0,
-    diagnostics = {},
-    autoArmMember = nil,
-    autoArmReversed = false,
-    autoArmLocked = false,
-    armCandidate = nil,
-    lastMotionActive = false
+    diagnostics = {}
 }
-
-local channelSources = {}
-local channelValues = {}
 
 local function clamp(value, low, high)
     if value < low then return low end
@@ -42,17 +31,10 @@ local function clamp(value, low, high)
     return value
 end
 
-local function channelHigh(value)
-    value = tonumber(value)
-    if value == nil then return nil end
-    if abs(value) <= 1.5 then return value > 0.2 end
-    if abs(value) <= 100 then return value > 25 end
-    return value >= 500
-end
-
 local function throttlePercent(value)
     value = tonumber(value)
     if value == nil then return nil end
+
     if value >= -1024 and value <= 1024 then
         return clamp((value + 1024) * 100 / 2048, 0, 100)
     end
@@ -63,96 +45,58 @@ local function throttlePercent(value)
     return clamp(value, 0, 100)
 end
 
-local function aegisPreferences()
-    local prefs = ofs3.session and ofs3.session.modelPreferences
-    local section = prefs and prefs["system/aegis"] or nil
-    local armChannel = floor(tonumber(section and section.armChannel) or 0)
-    local armReversed = tonumber(section and section.armReversed) == 1
-    return clamp(armChannel, 0, MAX_CHANNELS), armReversed
-end
-
-local function getChannelSource(member)
-    if member == nil or not system.getSource or CATEGORY_CHANNEL == nil then return nil end
-    if channelSources[member] == nil then
-        channelSources[member] = system.getSource({category = CATEGORY_CHANNEL, member = member, options = 0})
+local function normalizeSourceState(value)
+    if type(value) == "boolean" then
+        return value
     end
-    return channelSources[member]
+
+    value = tonumber(value)
+    if value == nil then return nil end
+
+    -- Physical switches, logical switches and channels can use different
+    -- numeric ranges. In every case the positive state is treated as active;
+    -- the configuration provides a Reverse option for negative-active setups.
+    if abs(value) <= 1.5 then return value > 0.2 end
+    if abs(value) <= 100 then return value > 1 end
+    return value > 0
 end
 
-local function readChannelMember(member)
-    local source = getChannelSource(member)
-    if not (source and type(source.value) == "function") then return nil end
-    local ok, value = pcall(source.value, source)
-    if not ok then return nil end
-    return tonumber(value)
+local function selectedArmConfig()
+    local config = ofs3.aegisArmConfig or {}
+    return config.source, config.reversed == true
 end
 
-local function excludedChannels(rx)
-    local excluded = {}
-    local map = rx and rx.map or {}
-    for name, member in pairs(map) do
-        if name ~= "arm" and member ~= nil then
-            excluded[tonumber(member)] = true
+local function selectedSourceName(source)
+    if not source then return "NO SOURCE" end
+    if type(source.name) == "function" then
+        local ok, name = pcall(source.name, source)
+        if ok and name and name ~= "" then
+            return tostring(name)
         end
     end
-    return excluded
+    return "ARM SOURCE"
 end
 
-local function scanForArmChannel(rx, motionActive)
-    local manualChannel = aegisPreferences()
-    if manualChannel > 0 or state.autoArmLocked then return end
+local function readSelectedArmSource()
+    local source, reversed = selectedArmConfig()
+    local name = selectedSourceName(source)
 
-    local excluded = excludedChannels(rx)
-    local now = os.clock()
-    for member = 0, MAX_CHANNELS - 1 do
-        if not excluded[member] then
-            local value = readChannelMember(member)
-            local previous = channelValues[member]
-            channelValues[member] = value
-            if value ~= nil and previous ~= nil and not motionActive then
-                if abs(value - previous) >= ARM_CHANGE_MINIMUM then
-                    state.armCandidate = {member = member, value = value, previous = previous, changedAt = now}
-                    state.autoArmMember = member
-                    state.autoArmReversed = channelHigh(value) == false
-                end
-            end
-        end
+    if not source or type(source.value) ~= "function" then
+        return nil, nil, false, name, reversed
     end
 
-    if state.armCandidate and now - state.armCandidate.changedAt > ARM_CANDIDATE_SECONDS then
-        state.armCandidate = nil
-        if not state.hasBeenInFlight then
-            state.autoArmMember = nil
-            state.autoArmReversed = false
-        end
-    end
-end
-
-local function readArmSignal(values, rx)
-    local armChannel, armReversed = aegisPreferences()
-    local raw, displayChannel, sourceName = nil, armChannel, "DEFAULT"
-
-    if armChannel > 0 then
-        raw = readChannelMember(armChannel - 1)
-        sourceName = "MANUAL"
-    elseif state.autoArmMember ~= nil then
-        displayChannel = state.autoArmMember + 1
-        raw = readChannelMember(state.autoArmMember)
-        armReversed = state.autoArmReversed
-        sourceName = state.autoArmLocked and "LEARNED" or "LEARNING"
-    else
-        raw = tonumber(values.arm)
-        local mappedMember = rx and rx.map and tonumber(rx.map.arm)
-        if mappedMember ~= nil then displayChannel = mappedMember + 1 end
+    local ok, raw = pcall(source.value, source)
+    if not ok then
+        return nil, nil, false, name, reversed
     end
 
-    local armed = channelHigh(raw)
-    local known = armed ~= nil
-    if sourceName == "DEFAULT" and raw ~= nil and abs(raw) < 10 then
-        known, armed = false, nil
+    local armed = normalizeSourceState(raw)
+    if armed == nil then
+        return raw, nil, false, name, reversed
     end
-    if known and armReversed then armed = not armed end
-    return raw, armed, known, displayChannel, armReversed, sourceName
+
+    if reversed then armed = not armed end
+    return raw, armed, true, name, reversed
 end
 
 local function readSignals()
@@ -164,22 +108,19 @@ local function readSignals()
     local rpmActive = rpm > ACTIVE_RPM
     local throttleActive = throttle ~= nil and throttle > THROTTLE_ACTIVE_PERCENT
     local motionActive = rpmActive or throttleActive
+    local armRaw, armActive, armKnown, armName, armReversed = readSelectedArmSource()
 
-    scanForArmChannel(rx, motionActive)
-
-    if motionActive and not state.lastMotionActive and state.autoArmMember ~= nil then
-        local current = readChannelMember(state.autoArmMember)
-        local currentHigh = channelHigh(current)
-        if currentHigh ~= nil then
-            state.autoArmReversed = currentHigh == false
-            state.autoArmLocked = true
-            state.seenArmedSignal = true
-        end
+    local source
+    if armKnown then
+        source = armActive and "ARM" or "SAFE"
+    elseif rpmActive then
+        source = "RPM"
+    elseif throttleActive then
+        source = "THR"
+    else
+        source = "SELECT"
     end
-    state.lastMotionActive = motionActive
 
-    local armRaw, armActive, armKnown, armChannel, armReversed, armSource = readArmSignal(values, rx)
-    local source = rpmActive and "RPM" or (throttleActive and "THR" or (armKnown and (armActive and "ARM" or "SAFE") or "ARM?"))
     return {
         rpm = rpm,
         throttleRaw = throttleRaw,
@@ -187,9 +128,8 @@ local function readSignals()
         armRaw = armRaw,
         armActive = armActive,
         armKnown = armKnown,
-        armChannel = armChannel,
+        armName = armName,
         armReversed = armReversed,
-        armSource = armSource,
         rpmActive = rpmActive,
         throttleActive = throttleActive,
         motionActive = motionActive,
@@ -206,18 +146,12 @@ local function resetState()
     state.timerBase = 0
     state.lastStatsAt = 0
     state.diagnostics = {}
-    state.autoArmMember = nil
-    state.autoArmReversed = false
-    state.autoArmLocked = false
-    state.armCandidate = nil
-    state.lastMotionActive = false
-    channelSources = {}
-    channelValues = {}
 end
 
 local function updateTimer(mode)
     local timer = ofs3.session and ofs3.session.timer
     if not timer then return end
+
     local now = os.time()
     if mode == "inflight" then
         if not state.timerStart then
@@ -240,9 +174,11 @@ end
 
 local function updateStats(mode)
     if mode ~= "inflight" or not (ofs3.session and ofs3.session.isConnected) then return end
+
     local now = os.clock()
     if now - state.lastStatsAt < STATS_INTERVAL then return end
     state.lastStatsAt = now
+
     telemetry.sensorStats = telemetry.sensorStats or {}
     for _, key in ipairs(trackedStats) do
         local value = tonumber(telemetry.getSensor(key))
@@ -262,16 +198,25 @@ local function updateStats(mode)
 end
 
 local function updateMode(result)
-    if result and (result.model_changed or result.flight_reset) then resetState() end
+    if result and (result.model_changed or result.flight_reset) then
+        resetState()
+    end
+
     local signals = readSignals()
     local previous = state.mode
-    if signals.armKnown and signals.armActive then state.seenArmedSignal = true end
 
-    if signals.motionActive then
+    if signals.armKnown and signals.armActive then
+        state.seenArmedSignal = true
+    end
+
+    -- Once a flight has started, an explicit selected-source DISARM has
+    -- priority over RPM. This changes to postflight immediately on disarm,
+    -- while throttle hold stays inflight because the arm source remains active.
+    if state.hasBeenInFlight and state.seenArmedSignal and signals.armKnown and not signals.armActive then
+        state.mode = "postflight"
+    elseif signals.motionActive then
         state.hasBeenInFlight = true
         state.mode = "inflight"
-    elseif state.hasBeenInFlight and state.seenArmedSignal and signals.armKnown and not signals.armActive then
-        state.mode = "postflight"
     elseif state.hasBeenInFlight then
         state.mode = "inflight"
     else
@@ -280,12 +225,13 @@ local function updateMode(result)
 
     signals.mode = state.mode
     signals.seenArmedSignal = state.seenArmedSignal
-    signals.autoArmLocked = state.autoArmLocked
     state.diagnostics = signals
     ofs3.session.aegisState = signals
     ofs3.flightmode.current = state.mode
+
     updateTimer(state.mode)
     updateStats(state.mode)
+
     if result then
         result.flightmode_changed = result.flightmode_changed or previous ~= state.mode
         result.aegis_mode = state.mode
@@ -296,15 +242,24 @@ function M.install(common)
     if common then
         common.flightState = function()
             local diagnostics = state.diagnostics
-            if not diagnostics or next(diagnostics) == nil then diagnostics = readSignals() end
+            if not diagnostics or next(diagnostics) == nil then
+                diagnostics = readSignals()
+            end
+
             if diagnostics.armKnown then
-                if diagnostics.armActive then return "ARMED", common.C.red, true end
+                if diagnostics.armActive then
+                    return "ARMED", common.C.red, true
+                end
                 return "DISARMED", common.C.green, false
             end
-            if diagnostics.motionActive then return "RUNNING", common.C.amber, nil end
-            return "ARM CH --", common.C.muted, nil
+
+            if diagnostics.motionActive then
+                return "RUNNING", common.C.amber, nil
+            end
+            return "SELECT ARM", common.C.muted, nil
         end
     end
+
     if not ofs3.runtime._aegisOriginalWakeup then
         ofs3.runtime._aegisOriginalWakeup = ofs3.runtime.wakeup
         ofs3.runtime.wakeup = function(...)
@@ -313,24 +268,33 @@ function M.install(common)
             return result
         end
     end
+
     return M
 end
 
 function M.getDiagnostics()
     local diagnostics = state.diagnostics
-    if not diagnostics or next(diagnostics) == nil then diagnostics = readSignals() end
+    if not diagnostics or next(diagnostics) == nil then
+        diagnostics = readSignals()
+    end
     return diagnostics
+end
+
+local function rawText(value)
+    if type(value) == "boolean" then return value and "1" or "0" end
+    value = tonumber(value)
+    if value == nil then return "--" end
+    return tostring(floor(value + (value >= 0 and 0.5 or -0.5)))
 end
 
 function M.diagnosticText()
     local diagnostics = M.getDiagnostics()
-    local channel = diagnostics.armChannel and diagnostics.armChannel > 0 and ("CH" .. tostring(diagnostics.armChannel)) or "AUTO"
-    local arm = diagnostics.armRaw == nil and "--" or tostring(floor(diagnostics.armRaw + 0.5))
+    local name = tostring(diagnostics.armName or "NO SOURCE")
+    if #name > 8 then name = name:sub(1, 8) end
     local throttle = diagnostics.throttle == nil and "--" or tostring(floor(diagnostics.throttle + 0.5)) .. "%"
     local rpm = tostring(floor((diagnostics.rpm or 0) + 0.5))
     local seen = diagnostics.seenArmedSignal and "Y" or "N"
-    local learned = diagnostics.autoArmLocked and "L" or "?"
-    return string.format("%s %s%s A:%s T:%s R:%s S:%s", tostring(diagnostics.source or "ARM?"), channel, learned, arm, throttle, rpm, seen)
+    return string.format("%s %s A:%s T:%s R:%s S:%s", tostring(diagnostics.source or "SELECT"), name, rawText(diagnostics.armRaw), throttle, rpm, seen)
 end
 
 ofs3.aegisStateManager = M
