@@ -3,6 +3,7 @@ local ofs3 = require("ofs3")
 local lcd = lcd
 local floor = math.floor
 local min = math.min
+local max = math.max
 local tostring = tostring
 
 local common = assert(loadfile("SCRIPTS:/" .. ofs3.config.baseDir .. "/widgets/dashboard/themes/@rt-rc/common.lua"))()
@@ -109,11 +110,11 @@ local function wakeup(box, telemetry)
     return cache
 end
 
-local function drawCheckRow(x, y, w, label, value, stateColor)
+local function drawCheckRow(x, y, w, label, value, stateColor, compact)
     lcd.color(stateColor)
-    lcd.drawFilledRectangle(floor(x), floor(y + 6), 7, 7)
-    common.drawTextAligned(x + 14, y, w * 0.45, label, "FONT_XS", C.muted, "left")
-    common.drawTextAligned(x + w * 0.48, y, w * 0.52, value, "FONT_S", C.white, "right")
+    lcd.drawFilledRectangle(floor(x), floor(y + (compact and 5 or 6)), 7, 7)
+    common.drawTextAligned(x + 14, y, w * 0.44, label, compact and "FONT_XXS" or "FONT_XS", C.muted, "left")
+    common.drawTextAligned(x + w * 0.46, y - (compact and 1 or 0), w * 0.54, value, compact and "FONT_XS" or "FONT_S", C.white, "right")
 end
 
 local function paint(x, y, w, h, box, cache)
@@ -121,12 +122,14 @@ local function paint(x, y, w, h, box, cache)
     lcd.color(C.bg)
     lcd.drawFilledRectangle(floor(x), floor(y), floor(w), floor(h))
 
-    local pad = 12
-    common.drawTextAligned(x + pad, y + 8, w * 0.55, "AEGIS // PRE-FLIGHT", "FONT_STD", C.cyan, "left")
-    common.drawTextAligned(x + w - 220, y + 8, 208, cache.status or "WAITING", "FONT_STD", cache.statusColor or C.muted, "right")
+    local compact = h < 360
+    local pad = compact and 10 or 12
+    local titleY = compact and 6 or 8
+    common.drawTextAligned(x + pad, y + titleY, w * 0.55, "AEGIS // PRE-FLIGHT", compact and "FONT_S" or "FONT_STD", C.cyan, "left")
+    common.drawTextAligned(x + w - 220, y + titleY, 208, cache.status or "WAITING", compact and "FONT_S" or "FONT_STD", cache.statusColor or C.muted, "right")
 
-    local bodyY = y + 42
-    local bodyH = h - 54
+    local bodyY = y + (compact and 38 or 42)
+    local bodyH = h - (compact and 48 or 54)
     local sideW = floor(w * 0.25)
     local centerW = w - sideW * 2 - pad * 4
     local leftX = x + pad
@@ -141,40 +144,51 @@ local function paint(x, y, w, h, box, cache)
     local _, _, packFull = common.packLimits()
 
     common.drawMetric(leftX, bodyY, sideW, cardH, "PACK VOLTAGE", common.formatValue(cache.voltage, 1, " V"), packColor, "main flight battery")
-    common.drawProgress(leftX + 12, bodyY + cardH - 36, sideW - 24, 9, cache.voltage and cache.voltage / packFull or 0, packColor)
+    common.drawProgress(leftX + 12, bodyY + cardH - 34, sideW - 24, 8, cache.voltage and cache.voltage / packFull or 0, packColor)
 
     common.drawMetric(leftX, bodyY + cardH + pad, sideW, cardH, "RADIO LINK", common.formatValue(cache.link, 0, "%"), linkColor, "telemetry link quality")
-    common.drawProgress(leftX + 12, bodyY + cardH * 2 + pad - 36, sideW - 24, 9, cache.link and cache.link / 100 or 0, linkColor)
+    common.drawProgress(leftX + 12, bodyY + cardH * 2 + pad - 34, sideW - 24, 8, cache.link and cache.link / 100 or 0, linkColor)
 
     common.drawPanel(centerX, bodyY, centerW, bodyH, cache.statusColor or C.muted, nil)
     local cx = centerX + centerW / 2
-    local cy = bodyY + bodyH * 0.42
-    local radius = min(centerW * 0.33, bodyH * 0.32)
-    common.drawHex(cx, cy, radius + 12, C.line2)
-    common.drawHex(cx, cy, radius, cache.statusColor or C.muted)
-    common.drawTextAligned(centerX, cy - 34, centerW, cache.status or "WAITING", "FONT_XXL", C.white, "center")
-    if cache.issueText then
-        common.drawTextAligned(centerX + 12, cy + 15, centerW - 24, cache.issueText, "FONT_XS", C.white, "center")
-        common.drawTextAligned(centerX, cy + 40, centerW, cache.statusSub or "ITEM TO REVIEW", "FONT_XXS", cache.statusColor or C.muted, "center")
+    local cy
+    local radius
+    if compact then
+        cy = bodyY + bodyH * 0.29
+        radius = min(centerW * 0.25, bodyH * 0.22)
     else
-        common.drawTextAligned(centerX, cy + 22, centerW, cache.statusSub or "CONNECT TELEMETRY", "FONT_XXS", cache.statusColor or C.muted, "center")
+        cy = bodyY + bodyH * 0.42
+        radius = min(centerW * 0.33, bodyH * 0.32)
     end
 
-    local segmentsY = bodyY + bodyH - 86
-    common.drawTextAligned(centerX + 18, segmentsY - 22, centerW - 36, "SMART FUEL", "FONT_XS", C.muted, "left")
-    common.drawTextAligned(centerX + 18, segmentsY - 24, centerW - 36, common.formatValue(cache.fuel, 0, "%"), "FONT_S", C.white, "right")
-    common.drawSegments(centerX + 18, segmentsY, centerW - 42, 18, cache.fuel or 0, 12, fuelColor)
+    common.drawHex(cx, cy, radius + (compact and 9 or 12), C.line2)
+    common.drawHex(cx, cy, radius, cache.statusColor or C.muted)
+    common.drawTextAligned(centerX, cy - (compact and 23 or 34), centerW, cache.status or "WAITING", compact and "FONT_XL" or "FONT_XXL", C.white, "center")
+    if cache.issueText then
+        common.drawTextAligned(centerX + 12, cy + (compact and 7 or 15), centerW - 24, cache.issueText, compact and "FONT_XXS" or "FONT_XS", C.white, "center")
+        common.drawTextAligned(centerX, cy + (compact and 25 or 40), centerW, cache.statusSub or "ITEM TO REVIEW", "FONT_XXS", cache.statusColor or C.muted, "center")
+    else
+        common.drawTextAligned(centerX, cy + (compact and 17 or 22), centerW, cache.statusSub or "CONNECT TELEMETRY", "FONT_XXS", cache.statusColor or C.muted, "center")
+    end
+
+    local segmentsY = compact and (bodyY + bodyH - 74) or (bodyY + bodyH - 86)
+    common.drawTextAligned(centerX + 18, segmentsY - (compact and 19 or 22), centerW - 36, "SMART FUEL", "FONT_XS", C.muted, "left")
+    common.drawTextAligned(centerX + 18, segmentsY - (compact and 21 or 24), centerW - 36, common.formatValue(cache.fuel, 0, "%"), compact and "FONT_XS" or "FONT_S", C.white, "right")
+    common.drawSegments(centerX + 18, segmentsY, centerW - 42, compact and 14 or 18, cache.fuel or 0, compact and 10 or 12, fuelColor)
     lcd.color(fuelColor)
-    lcd.drawFilledRectangle(floor(centerX + centerW - 20), floor(segmentsY + 5), 5, 8)
-    common.drawStateBadge(centerX + 18, segmentsY + 31, centerW - 36, 27, cache.state, cache.stateColor)
+    lcd.drawFilledRectangle(floor(centerX + centerW - 20), floor(segmentsY + (compact and 3 or 5)), 5, 8)
+    common.drawStateBadge(centerX + 18, segmentsY + (compact and 25 or 31), centerW - 36, compact and 25 or 27, cache.state, cache.stateColor)
 
     common.drawMetric(rightX, bodyY, sideW, cardH, "ESC THERMAL", common.formatValue(cache.esc, 0, "°C"), escColor, "controller temperature")
-    common.drawProgress(rightX + 12, bodyY + cardH - 36, sideW - 24, 9, cache.esc and cache.esc / common.getConfig("esc_max") or 0, escColor)
+    common.drawProgress(rightX + 12, bodyY + cardH - 34, sideW - 24, 8, cache.esc and cache.esc / common.getConfig("esc_max") or 0, escColor)
 
-    common.drawPanel(rightX, bodyY + cardH + pad, sideW, cardH, C.violet, "FLIGHT SETUP")
-    drawCheckRow(rightX + 14, bodyY + cardH + pad + 42, sideW - 28, "PROFILE", common.formatValue(cache.profile, 0, ""), C.violet)
-    drawCheckRow(rightX + 14, bodyY + cardH + pad + 78, sideW - 28, "PACK", common.formatValue(cache.voltage, 1, " V"), packColor)
-    drawCheckRow(rightX + 14, bodyY + cardH + pad + 114, sideW - 28, "STATE", cache.state or "--", cache.stateColor or C.muted)
+    local setupY = bodyY + cardH + pad
+    common.drawPanel(rightX, setupY, sideW, cardH, C.violet, "FLIGHT SETUP")
+    local rowStart = setupY + (compact and 34 or 42)
+    local rowStep = compact and max(20, floor((cardH - 43) / 3)) or 36
+    drawCheckRow(rightX + 14, rowStart, sideW - 28, "PROFILE", common.formatValue(cache.profile, 0, ""), C.violet, compact)
+    drawCheckRow(rightX + 14, rowStart + rowStep, sideW - 28, "PACK", common.formatValue(cache.voltage, 1, " V"), packColor, compact)
+    drawCheckRow(rightX + 14, rowStart + rowStep * 2, sideW - 28, "STATE", cache.state or "--", cache.stateColor or C.muted, compact)
 end
 
 local boxes = {{
