@@ -13,6 +13,50 @@ local supportedResolutions = {
     {630, 236}, {630, 258}, {640, 338}, {640, 360}
 }
 
+-- Ethos renders a full-screen widget inside a slightly reduced preview
+-- viewport while the screen layout editor is open. Accept that temporary
+-- viewport without changing the dimensions used on the normal main screen.
+local function physicalLcdSize()
+    local version = system and system.getVersion and system.getVersion() or {}
+    return tonumber(version.lcdWidth), tonumber(version.lcdHeight)
+end
+
+local function isConfigurationPreviewSize(width, height)
+    width = tonumber(width) or 0
+    height = tonumber(height) or 0
+
+    local lcdWidth, lcdHeight = physicalLcdSize()
+    if not lcdWidth or not lcdHeight then return false end
+
+    local widthMargin = math.max(24, math.floor(lcdWidth * 0.08))
+    local minimumHeight = math.floor(lcdHeight * 0.55)
+
+    return width >= (lcdWidth - widthMargin)
+        and width <= (lcdWidth + 12)
+        and height >= minimumHeight
+        and height <= (lcdHeight + 12)
+end
+
+local function isSupportedWidgetSize(width, height)
+    if dashboard.utils.supportedResolution(width, height, supportedResolutions) then
+        return true
+    end
+    return isConfigurationPreviewSize(width, height)
+end
+
+local function isFullScreenWindow(width, height)
+    local known = dashboard.utils.isFullScreen(width, height)
+    if known ~= nil then return known end
+
+    local lcdWidth, lcdHeight = physicalLcdSize()
+    if not lcdWidth or not lcdHeight then return false end
+
+    local widthMargin = math.max(24, math.floor(lcdWidth * 0.08))
+    return width >= (lcdWidth - widthMargin)
+        and width <= (lcdWidth + 12)
+        and height >= math.floor(lcdHeight * 0.80)
+end
+
 local themeRootPath = "SCRIPTS:/" .. ofs3.config.baseDir .. "/widgets/dashboard/themes/"
 
 local THEME_REGISTRY = {
@@ -289,7 +333,7 @@ local function buildRects(module)
     local headerBoxes = module.header_boxes or {}
 
     local windowW, windowH = lcd.getWindowSize()
-    local isFullScreen = utils.isFullScreen(windowW, windowH)
+    local isFullScreen = isFullScreenWindow(windowW, windowH)
 
     local cols = layout.cols or 1
     local rows = layout.rows or 1
@@ -408,7 +452,7 @@ local function paintObjects()
     if not ofs3.session.telemetryState and currentState ~= "postflight" then
         local windowW, windowH = lcd.getWindowSize()
         local offsetY = 0
-        if module.header_layout and dashboard.utils.isFullScreen(windowW, windowH) then
+        if module.header_layout and isFullScreenWindow(windowW, windowH) then
             offsetY = module.header_layout.height or 0
         end
         dashboard.overlaymessage(0, offsetY, windowW, windowH - offsetY, "Waiting for telemetry")
@@ -512,7 +556,7 @@ function dashboard.wakeup(widget)
     local runtimeState = ofs3.runtime.wakeup()
 
     local width, height = lcd.getWindowSize()
-    unsupportedResolution = not dashboard.utils.supportedResolution(width, height, supportedResolutions)
+    unsupportedResolution = not isSupportedWidgetSize(width, height)
     if unsupportedResolution then
         lcd.invalidate(widget)
         return
