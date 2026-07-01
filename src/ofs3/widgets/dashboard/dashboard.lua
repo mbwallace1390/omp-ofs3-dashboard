@@ -38,10 +38,14 @@ local function isConfigurationPreviewSize(width, height)
 end
 
 local function isSupportedWidgetSize(width, height)
-    if dashboard.utils.supportedResolution(width, height, supportedResolutions) then
-        return true
-    end
-    return isConfigurationPreviewSize(width, height)
+    width = tonumber(width) or 0
+    height = tonumber(height) or 0
+
+    -- The Ethos screen-layout editor can report a temporary preview size
+    -- that is not one of the normal runtime resolutions. The dashboard is
+    -- responsive, so accept every usable preview and reject only invalid or
+    -- genuinely tiny widget areas.
+    return width >= 240 and height >= 120
 end
 
 local function isFullScreenWindow(width, height)
