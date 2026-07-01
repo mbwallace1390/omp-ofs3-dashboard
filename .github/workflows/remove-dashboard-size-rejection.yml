@@ -1,0 +1,64 @@
+name: Remove dashboard preview size rejection
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/remove-dashboard-size-rejection.yml
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Accept normal Ethos preview areas
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path("src/ofs3/widgets/dashboard/dashboard.lua")
+          text = path.read_text(encoding="utf-8")
+
+          old = '''local function isSupportedWidgetSize(width, height)
+              if dashboard.utils.supportedResolution(width, height, supportedResolutions) then
+                  return true
+              end
+              return isConfigurationPreviewSize(width, height)
+          end
+          '''
+
+          new = '''local function isSupportedWidgetSize(width, height)
+              width = tonumber(width) or 0
+              height = tonumber(height) or 0
+
+              -- The Ethos screen-layout editor can report a temporary preview size
+              -- that is not one of the normal runtime resolutions. The dashboard is
+              -- responsive, so accept every usable preview and reject only invalid or
+              -- genuinely tiny widget areas.
+              return width >= 240 and height >= 120
+          end
+          '''
+
+          if old not in text:
+              raise SystemExit("size-check function not found")
+
+          text = text.replace(old, new, 1)
+          path.write_text(text, encoding="utf-8")
+          PY
+
+          rm -f .github/workflows/remove-dashboard-size-rejection.yml
+
+          git config user.name "Michael Wallace"
+          git config user.email "mbwallace1390@users.noreply.github.com"
+          git add -A
+          git commit -m "Allow Ethos dashboard configuration preview"
+          git push origin HEAD:main
