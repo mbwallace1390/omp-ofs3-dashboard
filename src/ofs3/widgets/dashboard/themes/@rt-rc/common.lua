@@ -19,7 +19,7 @@ local colorMode = utils.themeColors()
 local M = {}
 
 M.DEFAULTS = {
-    rpm_max = 2500,
+    rpm_max = 6000,
     esc_warn = 110,
     esc_max = 150,
     fuel_warn = 25,
