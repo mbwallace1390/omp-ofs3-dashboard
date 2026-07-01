@@ -13,9 +13,17 @@ local supportedResolutions = {
     {630, 236}, {630, 258}, {640, 338}, {640, 360}
 }
 
-local themeBasePath = "SCRIPTS:/" .. ofs3.config.baseDir .. "/widgets/dashboard/themes/@rt-rc/"
+local themeRootPath = "SCRIPTS:/" .. ofs3.config.baseDir .. "/widgets/dashboard/themes/"
+
+local THEME_REGISTRY = {
+    [1] = {name = "Aegis Polished", folder = "@rt-rc"},
+    [2] = {name = "OFS3 Classic", folder = "@rt-rc-classic"}
+}
+
 local currentState = nil
 local loadedStates = {}
+local loadedThemeIndex = nil
+local themeReloadRequested = false
 local lastSizeKey = nil
 local themeStateSignature = nil
 local nextThemeStateCheck = 0
@@ -43,6 +51,48 @@ dashboard._moduleCache = {}
 dashboard.toolbarVisible = dashboard.toolbarVisible or false
 dashboard.selectedToolbarIndex = dashboard.selectedToolbarIndex or nil
 dashboard.toolbarLastActivityAt = dashboard.toolbarLastActivityAt or 0
+
+dashboard.selectedTheme = tonumber(dashboard.selectedTheme) or 1
+
+local function normalizeThemeIndex(value)
+    value = math.floor(tonumber(value) or 1)
+    if not THEME_REGISTRY[value] then
+        return 1
+    end
+    return value
+end
+
+function dashboard.getThemeChoices()
+    local choices = {}
+    for index = 1, #THEME_REGISTRY do
+        local entry = THEME_REGISTRY[index]
+        choices[#choices + 1] = {entry.name, index}
+    end
+    return choices
+end
+
+function dashboard.getThemeIndex()
+    return normalizeThemeIndex(dashboard.selectedTheme)
+end
+
+function dashboard.setTheme(index)
+    index = normalizeThemeIndex(index)
+    if dashboard.selectedTheme ~= index then
+        dashboard.selectedTheme = index
+        themeReloadRequested = true
+    end
+    return index
+end
+
+function dashboard.getThemeName()
+    local entry = THEME_REGISTRY[dashboard.getThemeIndex()]
+    return entry and entry.name or "Aegis Polished"
+end
+
+local function themePath(index)
+    local entry = THEME_REGISTRY[normalizeThemeIndex(index)] or THEME_REGISTRY[1]
+    return themeRootPath .. entry.folder .. "/"
+end
 
 function dashboard.touchToolbar()
     dashboard.toolbarLastActivityAt = os.clock()
@@ -173,14 +223,56 @@ local function loadObjects(module)
     end
 end
 
+local function loadThemeModules(index)
+    local basePath = themePath(index)
+    local modules = {}
+
+    for _, stateName in ipairs({"preflight", "inflight", "postflight"}) do
+        local filePath = basePath .. stateName .. ".lua"
+        local loader, loadError = loadfile(filePath)
+        if not loader then
+            return nil, loadError or ("Unable to load " .. filePath)
+        end
+
+        local ok, module = pcall(loader)
+        if not ok then
+            return nil, module
+        end
+        modules[stateName] = module
+    end
+
+    return modules
+end
+
 local function reloadTheme()
-    themeStateSignature = dashboard.utils and dashboard.utils.getThemeSignature and dashboard.utils.getThemeSignature() or themeStateSignature
+    themeStateSignature = dashboard.utils and dashboard.utils.getThemeSignature and
+        dashboard.utils.getThemeSignature() or themeStateSignature
     nextThemeStateCheck = os.clock() + themeStateCheckInterval
-    loadedStates = {
-        preflight = assert(loadfile(themeBasePath .. "preflight.lua"))(),
-        inflight = assert(loadfile(themeBasePath .. "inflight.lua"))(),
-        postflight = assert(loadfile(themeBasePath .. "postflight.lua"))()
-    }
+
+    local requestedIndex = dashboard.getThemeIndex()
+    local modules, loadError = loadThemeModules(requestedIndex)
+
+    -- A missing or damaged optional theme must never leave the dashboard blank.
+    -- Fall back to the polished Aegis theme and keep the widget usable.
+    if not modules and requestedIndex ~= 1 then
+        if ofs3.utils and ofs3.utils.log then
+            ofs3.utils.log(
+                "Theme load failed for " .. dashboard.getThemeName() ..
+                "; reverting to Aegis Polished: " .. tostring(loadError)
+            )
+        end
+        dashboard.selectedTheme = 1
+        requestedIndex = 1
+        modules, loadError = loadThemeModules(1)
+    end
+
+    if not modules then
+        error("Unable to load dashboard theme: " .. tostring(loadError))
+    end
+
+    loadedStates = modules
+    loadedThemeIndex = requestedIndex
+    themeReloadRequested = false
 
     dashboard.utils.resetImageCache()
     dashboard.boxRects = {}
@@ -319,7 +411,7 @@ local function paintObjects()
         if module.header_layout and dashboard.utils.isFullScreen(windowW, windowH) then
             offsetY = module.header_layout.height or 0
         end
-        dashboard.overlaymessage(0, offsetY, windowW, windowH - offsetY, "@i18n(widgets.dashboard.telemetry_waiting)@")
+        dashboard.overlaymessage(0, offsetY, windowW, windowH - offsetY, "Waiting for telemetry")
     end
 end
 
@@ -343,7 +435,7 @@ function dashboard.menu(widget)
 
     return {
         {
-            "@i18n(widgets.dashboard.reset_flight)@",
+            "Reset Flight",
             function()
                 logWidgetMenu("selected Reset Flight")
                 if type(dashboard.resetFlightModeAsk) == "function" then
@@ -360,7 +452,7 @@ end
 function dashboard.resetFlightModeAsk()
     local buttons = {
         {
-            label = "@i18n(widgets.dashboard.ok)@",
+            label = "OK",
             action = function()
                 if ofs3.runtime and ofs3.runtime.resetFlight then
                     ofs3.runtime.resetFlight()
@@ -376,7 +468,7 @@ function dashboard.resetFlightModeAsk()
             end
         },
         {
-            label = "@i18n(widgets.dashboard.cancel)@",
+            label = "Cancel",
             action = function()
                 return true
             end
@@ -384,8 +476,8 @@ function dashboard.resetFlightModeAsk()
     }
 
     form.openDialog({
-        title = "@i18n(widgets.dashboard.reset_flight)@",
-        message = "@i18n(widgets.dashboard.reset_flight_message)@",
+        title = "Reset Flight",
+        message = "Reset dashboard flight state and session timer?",
         buttons = buttons,
         options = TEXT_LEFT
     })
@@ -393,7 +485,7 @@ end
 
 function dashboard.paint()
     if unsupportedResolution then
-        dashboard.utils.screenError("@i18n(widgets.dashboard.unsupported_widget_size)@", true, 0.5)
+        dashboard.utils.screenError("Unsupported widget size", true, 0.5)
         return
     end
 
@@ -426,7 +518,10 @@ function dashboard.wakeup(widget)
         return
     end
 
-    if runtimeState.model_changed then
+    local requestedThemeIndex = dashboard.getThemeIndex()
+    if themeReloadRequested or loadedThemeIndex ~= requestedThemeIndex then
+        reloadTheme()
+    elseif runtimeState.model_changed then
         reloadTheme()
     elseif now >= nextThemeStateCheck then
         nextThemeStateCheck = now + themeStateCheckInterval

@@ -14,7 +14,7 @@ local cachedSensors = {}
 local createRetryAt = {}
 local cacheExpireTime = 30
 local lastCacheFlushTime = os.clock()
-local wakeupInterval = 1
+local wakeupInterval = 0.20
 local lastWakeupTime = 0
 local simSensorList = nil
 local CRSF_RPM_MAXIMUM = 65000
@@ -230,19 +230,24 @@ local function updateSimulationSensors(rootSource)
 end
 
 local function deriveArmedValue()
-    local rx = ofs3.session and ofs3.session.rx and ofs3.session.rx.values or nil
-    local value = rx and tonumber(rx.arm) or nil
-    if value == nil then
-        return 1
+    -- A radio switch position is not proof that the helicopter is connected.
+    -- Suppress the derived arm sensor completely while telemetry is absent.
+    if not (ofs3.session and ofs3.session.isConnected) then
+        return nil
     end
 
-    local config = ofs3.session and ofs3.session.aegisConfig or {}
-    local active = value > 100
-    if tonumber(config.armReversed) == 1 then
-        active = not active
+    -- When the two configured safety switches are readable, publish the same
+    -- latched arm state used by the screen state machine.
+    if ofs3.mwrcSafetyUsingSwitches then
+        if ofs3.mwrcArmedLatched == true then
+            return 0 -- armed
+        end
+        return 1 -- disarmed
     end
 
-    return active and 0 or 1
+    -- RPM fallback mode intentionally does not invent a switch-confirmed arm
+    -- state. Leave the derived sensor invalid until SG/SD are configured.
+    return nil
 end
 
 local function deriveProfileValue()

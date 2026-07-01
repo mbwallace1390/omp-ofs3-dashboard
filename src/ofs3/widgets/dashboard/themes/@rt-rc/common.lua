@@ -271,7 +271,7 @@ function M.headerBoxes()
                 lcd.drawFilledRectangle(floor(x), floor(y), floor(w), floor(h))
                 local font = M.resolveFont("FONT_L")
                 lcd.font(font)
-                local first, divider, last = "AEGIS ", "// ", "OFS3"
+                local first, divider, last = "ETHOS ", "// ", "OFS3"
                 local w1, textHeight = lcd.getTextSize(first)
                 local w2 = lcd.getTextSize(divider)
                 local w3 = lcd.getTextSize(last)
@@ -308,6 +308,7 @@ function M.headerBoxes()
             col = 7, row = 1,
             type = "gauge", subtype = "step", source = "rssi",
             font = "FONT_XS", stepgap = 2, stepcount = 5, decimals = 0,
+            hidevalue = true,
             barpaddingleft = options.barpaddingleft,
             barpaddingright = options.barpaddingright,
             barpaddingbottom = options.barpaddingbottom,

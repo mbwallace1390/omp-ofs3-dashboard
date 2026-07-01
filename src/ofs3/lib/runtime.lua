@@ -12,6 +12,14 @@ local telemetry = ofs3.tasks.telemetry
 local trackedStats = {"rssi", "voltage", "rpm", "current", "temp_esc", "consumption", "smartfuel"}
 local FLIGHT_COUNT_MIN_SECONDS = 10
 
+-- MWRC switch-safety screen control, telemetry-gated v7.
+-- The selected Throttle Cut and Throttle Hold positions are authoritative only
+-- while live OFS3 telemetry is connected. RPM remains a configuration fallback.
+local FLIGHT_START_RPM = 1000
+local FLIGHT_STOP_RPM = 250
+local POSTFLIGHT_RPM_DELAY = 8.0
+local POSTFLIGHT_DISPLAY_SECONDS = 8.0
+
 local defaultBatteryConfig = {
     batteryCapacity = 750,
     batteryCellCount = 3,
@@ -54,6 +62,20 @@ local modelPreferenceDefaults = {
 local currentModelKey = nil
 local currentFlightMode = "preflight"
 local hasBeenInFlight = false
+local rpmBelowStopSince = nil
+local postflightEnteredAt = nil
+
+-- Radio-side OFS3 safety sequence:
+--   1. Cut active + Hold active primes the safe arming sequence.
+--   2. Release Cut while Hold remains active latches Armed.
+--   3. Release Hold starts Inflight.
+--   4. Hold may be re-applied in flight without ending the flight.
+--   5. Cut active is the only switch action that ends the flight.
+local armSequenceReady = false
+local switchArmed = false
+local lastCutActive = nil
+local lastHoldActive = nil
+
 local lastStatsAt = 0
 local currentTelemetryType = nil
 local lastTelemetryAvailable = nil
@@ -145,15 +167,12 @@ local function buildBatteryConfig(prefs)
     return battery
 end
 
-local buildAegisConfig
-
 local function loadModelPreferences(modelKey)
     local merged, prefFile = loadModelPreferencesData(modelKey)
 
     ofs3.session.modelPreferences = merged
     ofs3.session.modelPreferencesFile = prefFile
     ofs3.session.batteryConfig = buildBatteryConfig(merged)
-    ofs3.session.aegisConfig = buildAegisConfig(merged, currentTelemetryType)
 end
 
 local function resetTimer()
@@ -206,6 +225,16 @@ local function initializeModel(modelKey)
     currentTelemetryType = nil
     lastTelemetryAvailable = nil
     hasBeenInFlight = false
+    rpmBelowStopSince = nil
+    postflightEnteredAt = nil
+    armSequenceReady = false
+    switchArmed = false
+    lastCutActive = nil
+    lastHoldActive = nil
+    ofs3.mwrcSafetyUsingSwitches = false
+    ofs3.mwrcArmedLatched = nil
+    ofs3.mwrcCutActive = nil
+    ofs3.mwrcHoldActive = nil
     lastStatsAt = 0
     channelSources = {}
     rxInitializedForProtocol = nil
@@ -236,38 +265,15 @@ local function normalizeBatterySettings(input)
     return output
 end
 
-local function defaultArmChannel(protocol)
-    if protocol == "sport" then
-        return 8
-    end
-    return 5
-end
-
-local function normalizeAegisSettings(input, protocol)
-    local settings = type(input) == "table" and input or {}
-    return {
-        armChannel = clamp(math.floor(tonumber(settings.armChannel) or defaultArmChannel(protocol)), 1, 24),
-        armReversed = clamp(math.floor(tonumber(settings.armReversed) or 0), 0, 1)
-    }
-end
-
-buildAegisConfig = function(prefs, protocol)
-    local section = prefs and prefs["system/aegis"] or nil
-    return normalizeAegisSettings(section, protocol)
-end
-
 function runtime.readWidgetSettings(widget)
     local modelKey = getModelKey()
     local prefs, prefFile = loadModelPreferencesData(modelKey)
     local battery = normalizeBatterySettings(buildBatteryConfig(prefs))
-    local aegis = buildAegisConfig(prefs, currentTelemetryType)
 
     if widget then
         for key, value in pairs(battery) do
             widget[key] = value
         end
-        widget.aegisArmChannel = aegis.armChannel
-        widget.aegisArmReversed = aegis.armReversed
         widget._modelKey = modelKey
         widget._preferencesFile = prefFile
     end
@@ -276,7 +282,6 @@ function runtime.readWidgetSettings(widget)
         ofs3.session.modelPreferences = prefs
         ofs3.session.modelPreferencesFile = prefFile
         ofs3.session.batteryConfig = copyTable(battery)
-        ofs3.session.aegisConfig = copyTable(aegis)
     end
 
     return battery, prefs, prefFile, modelKey
@@ -286,10 +291,6 @@ function runtime.writeWidgetSettings(widget)
     local modelKey = (widget and widget._modelKey) or getModelKey()
     local prefs, prefFile = loadModelPreferencesData(modelKey)
     local battery = normalizeBatterySettings(widget or {})
-    local aegis = normalizeAegisSettings({
-        armChannel = widget and widget.aegisArmChannel,
-        armReversed = widget and widget.aegisArmReversed
-    }, currentTelemetryType)
 
     prefs.battery = prefs.battery or {}
     for key, value in pairs(battery) do
@@ -299,24 +300,12 @@ function runtime.writeWidgetSettings(widget)
         end
     end
 
-    prefs["system/aegis"] = prefs["system/aegis"] or {}
-    prefs["system/aegis"].armChannel = aegis.armChannel
-    prefs["system/aegis"].armReversed = aegis.armReversed
-
-    if widget then
-        widget.aegisArmChannel = aegis.armChannel
-        widget.aegisArmReversed = aegis.armReversed
-    end
-
     ofs3.ini.save_ini_file(prefFile, prefs)
 
     if currentModelKey == modelKey then
         ofs3.session.modelPreferences = prefs
         ofs3.session.modelPreferencesFile = prefFile
         ofs3.session.batteryConfig = copyTable(battery)
-        ofs3.session.aegisConfig = copyTable(aegis)
-        channelSources = {}
-        rxInitializedForProtocol = nil
     end
 
     return true
@@ -328,15 +317,13 @@ local function initializeRxMap(protocol)
     ofs3.session.rx.values = ofs3.session.rx.values or {}
 
     local map = ofs3.session.rx.map
-    local aegis = buildAegisConfig(ofs3.session.modelPreferences, protocol)
-    ofs3.session.aegisConfig = copyTable(aegis)
 
     if protocol == "sport" then
         map.aileron = 0
         map.elevator = 1
         map.collective = 5
         map.rudder = 3
-        map.arm = aegis.armChannel - 1
+        map.arm = 7
         map.throttle = 2
         map.mode = 6
         map.headspeed = 6
@@ -345,7 +332,7 @@ local function initializeRxMap(protocol)
         map.elevator = 1
         map.collective = 2
         map.rudder = 3
-        map.arm = aegis.armChannel - 1
+        map.arm = 4
         map.throttle = 5
         map.mode = 6
         map.headspeed = 7
@@ -459,26 +446,194 @@ local function updateTelemetryState()
     return protocol, recovered
 end
 
-local function determineFlightMode()
-    local rpm = telemetry.getSensor("rpm") or 0
-    local armed = telemetry.getSensor("armed")
-    local isArmed = armed == 0
-
-    if isArmed and rpm > 1000 then
-        hasBeenInFlight = true
-        return "inflight"
+local function normalizeSwitchPosition(value)
+    if type(value) == "boolean" then
+        return value
     end
 
-    -- Keep the live flight screen through throttle hold or autorotation.
-    -- Only an explicit disarm may end a flight and open the debrief screen.
-    if hasBeenInFlight then
-        if isArmed then
-            return "inflight"
+    value = tonumber(value)
+    if value == nil then
+        return nil
+    end
+
+    return value ~= 0
+end
+
+local function readSwitchPosition(source)
+    if not source then
+        return nil
+    end
+
+    -- Ethos switch-position sources should report whether the selected
+    -- position is active through state(). value() is a compatibility fallback.
+    if type(source.state) == "function" then
+        local ok, value = pcall(source.state, source)
+        if ok and value ~= nil then
+            return normalizeSwitchPosition(value)
         end
-        return "postflight"
     end
 
-    return "preflight"
+    if type(source.value) == "function" then
+        local ok, value = pcall(source.value, source)
+        if ok and value ~= nil then
+            return normalizeSwitchPosition(value)
+        end
+    end
+
+    return nil
+end
+
+local function readConfiguredSafetySwitches()
+    local cutActive = readSwitchPosition(ofs3.mwrcThrottleCutSource)
+    local holdActive = readSwitchPosition(ofs3.mwrcThrottleHoldSource)
+
+    if cutActive == nil or holdActive == nil then
+        return nil, nil
+    end
+
+    return cutActive, holdActive
+end
+
+local function publishSafetyState(usingSwitches, cutActive, holdActive)
+    ofs3.mwrcSafetyUsingSwitches = usingSwitches
+    ofs3.mwrcCutActive = cutActive
+    ofs3.mwrcHoldActive = holdActive
+
+    if usingSwitches then
+        ofs3.mwrcArmedLatched = switchArmed
+    else
+        ofs3.mwrcArmedLatched = nil
+    end
+end
+
+local function determineSwitchFlightMode(cutActive, holdActive)
+    lastCutActive = cutActive
+    lastHoldActive = holdActive
+
+    -- The true disarm command. Hold can be in any position here.
+    if cutActive then
+        switchArmed = false
+
+        -- OFS3 requires both safety conditions before the next arm attempt.
+        if holdActive then
+            armSequenceReady = true
+        end
+
+        publishSafetyState(true, cutActive, holdActive)
+
+        if hasBeenInFlight then
+            return "postflight", false
+        end
+
+        return "preflight", false
+    end
+
+    -- Cut is released. Only latch Armed after the safe sequence has first been
+    -- observed with both Cut and Hold active, and Hold is still active now.
+    if not switchArmed then
+        if armSequenceReady and holdActive then
+            switchArmed = true
+            armSequenceReady = false
+            publishSafetyState(true, cutActive, holdActive)
+
+            -- Re-arming after a completed flight begins a clean new session.
+            if currentFlightMode == "postflight" or hasBeenInFlight then
+                return "preflight", true
+            end
+
+            return "preflight", false
+        end
+
+        publishSafetyState(true, cutActive, holdActive)
+
+        -- Unsafe or incomplete sequence: never enter Inflight.
+        if currentFlightMode == "postflight" then
+            return "postflight", false
+        end
+        return "preflight", false
+    end
+
+    publishSafetyState(true, cutActive, holdActive)
+
+    -- Once a flight has begun, temporary Throttle Hold remains Inflight.
+    if hasBeenInFlight then
+        return "inflight", false
+    end
+
+    -- Armed with Hold active is the ready-to-fly Preflight state.
+    if holdActive then
+        return "preflight", false
+    end
+
+    -- Releasing Hold after the valid safety sequence starts the flight.
+    hasBeenInFlight = true
+    return "inflight", false
+end
+
+local function determineRpmFallbackMode()
+    local rpm = tonumber(telemetry.getSensor("rpm")) or 0
+    local now = os.clock()
+
+    if currentFlightMode == "postflight" and hasBeenInFlight then
+        postflightEnteredAt = postflightEnteredAt or now
+
+        if rpm > FLIGHT_STOP_RPM then
+            return "preflight", true
+        end
+
+        if now - postflightEnteredAt >= POSTFLIGHT_DISPLAY_SECONDS then
+            return "preflight", true
+        end
+
+        return "postflight", false
+    end
+
+    if rpm > FLIGHT_START_RPM then
+        hasBeenInFlight = true
+        rpmBelowStopSince = nil
+        postflightEnteredAt = nil
+        return "inflight", false
+    end
+
+    if hasBeenInFlight then
+        if rpm <= FLIGHT_STOP_RPM then
+            if rpmBelowStopSince == nil then
+                rpmBelowStopSince = now
+            end
+
+            if now - rpmBelowStopSince >= POSTFLIGHT_RPM_DELAY then
+                postflightEnteredAt = postflightEnteredAt or now
+                return "postflight", false
+            end
+        else
+            rpmBelowStopSince = nil
+        end
+
+        return "inflight", false
+    end
+
+    rpmBelowStopSince = nil
+    postflightEnteredAt = nil
+    return "preflight", false
+end
+
+local function determineFlightMode()
+    -- Radio switch movement by itself must never create a flight-state change.
+    -- Without live OFS3 telemetry, keep the current screen frozen. On startup
+    -- currentFlightMode is Preflight, so an unpowered helicopter remains there.
+    if not (ofs3.session and ofs3.session.isConnected) then
+        publishSafetyState(false, nil, nil)
+        return currentFlightMode, false
+    end
+
+    local cutActive, holdActive = readConfiguredSafetySwitches()
+
+    if cutActive ~= nil and holdActive ~= nil then
+        return determineSwitchFlightMode(cutActive, holdActive)
+    end
+
+    publishSafetyState(false, nil, nil)
+    return determineRpmFallbackMode()
 end
 
 local function updateTimer()
@@ -592,6 +747,8 @@ end
 
 function runtime.resetFlight()
     hasBeenInFlight = false
+    rpmBelowStopSince = nil
+    postflightEnteredAt = nil
     currentFlightMode = "preflight"
     ofs3.flightmode.current = "preflight"
     lastStatsAt = 0
@@ -636,8 +793,17 @@ function runtime.wakeup()
         ofs3.events.wakeup()
     end
 
-    local nextFlightMode = determineFlightMode()
-    local flightModeChanged = resetOnTelemetryRecovered or nextFlightMode ~= currentFlightMode
+    local nextFlightMode, automaticFlightReset = determineFlightMode()
+
+    if automaticFlightReset then
+        runtime.resetFlight()
+        nextFlightMode = "preflight"
+    end
+
+    local flightModeChanged =
+        resetOnTelemetryRecovered or automaticFlightReset or
+        nextFlightMode ~= currentFlightMode
+
     currentFlightMode = nextFlightMode
     ofs3.flightmode.current = nextFlightMode
 
@@ -651,7 +817,7 @@ function runtime.wakeup()
         model_changed = modelChanged,
         telemetry_recovered = telemetryRecovered,
         flightmode_changed = flightModeChanged or systemFlightReset,
-        flight_reset = systemFlightReset
+        flight_reset = systemFlightReset or automaticFlightReset
     }
 end
 
