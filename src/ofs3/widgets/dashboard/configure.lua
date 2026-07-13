@@ -28,6 +28,13 @@ local function ensureWidgetDefaults(widget)
     ofs3.runtime.readWidgetSettings(widget)
 end
 
+local themesModule
+
+local function ensureThemesModule()
+    themesModule = themesModule or assert(loadfile("SCRIPTS:/" .. ofs3.config.baseDir .. "/widgets/dashboard/lib/themes.lua"))()
+    return themesModule
+end
+
 function configui.read(widget)
     ensureWidgetDefaults(widget)
     return true
@@ -39,6 +46,20 @@ end
 
 function configui.configure(widget)
     ensureWidgetDefaults(widget)
+
+    local themes = ensureThemesModule()
+    local themeList = themes.list()
+    local themeValues = {}
+    for _, entry in ipairs(themeList) do
+        themeValues[#themeValues + 1] = {entry.name, entry.id}
+    end
+
+    local themeLine = addLine(nil, "@i18n(widgets.dashboard.configure_theme)@")
+    form.addChoiceField(themeLine, nil, themeValues, function()
+        return widget.dashboardTheme or themes.defaultId()
+    end, function(value)
+        widget.dashboardTheme = value
+    end)
 
     local cellsLine = addLine(nil, "@i18n(widgets.dashboard.configure_cell_count)@")
     local cellsField = form.addNumberField(cellsLine, nil, 1, 14, function()

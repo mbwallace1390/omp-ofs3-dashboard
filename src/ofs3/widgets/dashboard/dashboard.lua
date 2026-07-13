@@ -13,13 +13,13 @@ local supportedResolutions = {
     {630, 236}, {630, 258}, {640, 338}, {640, 360}
 }
 
-local themeBasePath = "SCRIPTS:/" .. ofs3.config.baseDir .. "/widgets/dashboard/themes/@rt-rc/"
 local currentState = nil
 local loadedStates = {}
 local lastSizeKey = nil
 local themeStateSignature = nil
 local nextThemeStateCheck = 0
 local themeStateCheckInterval = 0.25
+local lastDashboardThemeVersion = nil
 local unsupportedResolution = false
 local forceFullRepaint = true
 local lastInvalidateAt = 0
@@ -62,6 +62,7 @@ end
 
 local function ensureDashboardLibraries()
     dashboard.utils = dashboard.utils or assert(loadfile("SCRIPTS:/" .. ofs3.config.baseDir .. "/widgets/dashboard/lib/utils.lua"))()
+    dashboard.themes = dashboard.themes or assert(loadfile("SCRIPTS:/" .. ofs3.config.baseDir .. "/widgets/dashboard/lib/themes.lua"))()
     dashboard.loaders = dashboard.loaders or assert(loadfile("SCRIPTS:/" .. ofs3.config.baseDir .. "/widgets/dashboard/lib/loaders.lua"))()
     dashboard.toolbar = dashboard.toolbar or assert(loadfile("SCRIPTS:/" .. ofs3.config.baseDir .. "/widgets/dashboard/lib/toolbar.lua"))()
 end
@@ -175,11 +176,17 @@ end
 
 local function reloadTheme()
     themeStateSignature = dashboard.utils and dashboard.utils.getThemeSignature and dashboard.utils.getThemeSignature() or themeStateSignature
+    lastDashboardThemeVersion = ofs3.session.dashboardThemeVersion
     nextThemeStateCheck = os.clock() + themeStateCheckInterval
+
+    local themeEntry = dashboard.themes.resolve(ofs3.session.dashboardTheme or dashboard.themes.defaultId())
+    local themeBasePath = dashboard.themes.basePath(themeEntry.id)
+    local meta = themeEntry.meta or {}
+
     loadedStates = {
-        preflight = assert(loadfile(themeBasePath .. "preflight.lua"))(),
-        inflight = assert(loadfile(themeBasePath .. "inflight.lua"))(),
-        postflight = assert(loadfile(themeBasePath .. "postflight.lua"))()
+        preflight = assert(loadfile(themeBasePath .. (meta.preflight or "preflight.lua")))(),
+        inflight = assert(loadfile(themeBasePath .. (meta.inflight or "inflight.lua")))(),
+        postflight = assert(loadfile(themeBasePath .. (meta.postflight or "postflight.lua")))()
     }
 
     dashboard.utils.resetImageCache()
@@ -426,7 +433,7 @@ function dashboard.wakeup(widget)
         return
     end
 
-    if runtimeState.model_changed then
+    if runtimeState.model_changed or ofs3.session.dashboardThemeVersion ~= lastDashboardThemeVersion then
         reloadTheme()
     elseif now >= nextThemeStateCheck then
         nextThemeStateCheck = now + themeStateCheckInterval

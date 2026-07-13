@@ -263,5 +263,10 @@
     "english": "Link Min",
     "translation": "Link Min",
     "needs_translation": false
+  },
+  "configure_theme": {
+    "english": "Theme",
+    "translation": "Theme",
+    "needs_translation": false
   }
 }

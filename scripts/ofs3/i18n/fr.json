@@ -21,6 +21,11 @@
         "needs_translation": true,
         "translation": "Cell Count"
       },
+      "configure_theme": {
+        "english": "Theme",
+        "needs_translation": false,
+        "translation": "Theme"
+      },
       "disarmed": {
         "english": "DISARMED",
         "needs_translation": true,

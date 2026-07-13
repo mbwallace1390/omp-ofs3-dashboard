@@ -28,6 +28,8 @@ local configurableBatteryFields = {
     batteryCellCount = true
 }
 
+local DEFAULT_DASHBOARD_THEME = "@rt-rc"
+
 local modelPreferenceDefaults = {
     general = {
         flightcount = 0,
@@ -43,6 +45,9 @@ local modelPreferenceDefaults = {
         vbatfullcellvoltage = 4.1,
         lvcPercentage = 30,
         consumptionWarningPercentage = 30
+    },
+    dashboard = {
+        theme = DEFAULT_DASHBOARD_THEME
     },
     ["system/@default"] = {
         tx_min = 7.2,
@@ -145,12 +150,31 @@ local function buildBatteryConfig(prefs)
     return battery
 end
 
+local function buildDashboardConfig(prefs)
+    local stored = prefs and prefs.dashboard or {}
+    local theme = stored.theme
+
+    if type(theme) ~= "string" or theme == "" then
+        theme = DEFAULT_DASHBOARD_THEME
+    end
+
+    return {dashboardTheme = theme}
+end
+
+local function setDashboardTheme(themeId)
+    if ofs3.session.dashboardTheme ~= themeId then
+        ofs3.session.dashboardTheme = themeId
+        ofs3.session.dashboardThemeVersion = (ofs3.session.dashboardThemeVersion or 0) + 1
+    end
+end
+
 local function loadModelPreferences(modelKey)
     local merged, prefFile = loadModelPreferencesData(modelKey)
 
     ofs3.session.modelPreferences = merged
     ofs3.session.modelPreferencesFile = prefFile
     ofs3.session.batteryConfig = buildBatteryConfig(merged)
+    setDashboardTheme(buildDashboardConfig(merged).dashboardTheme)
 end
 
 local function resetTimer()
@@ -237,11 +261,13 @@ function runtime.readWidgetSettings(widget)
     local modelKey = getModelKey()
     local prefs, prefFile = loadModelPreferencesData(modelKey)
     local battery = normalizeBatterySettings(buildBatteryConfig(prefs))
+    local dashboardConfig = buildDashboardConfig(prefs)
 
     if widget then
         for key, value in pairs(battery) do
             widget[key] = value
         end
+        widget.dashboardTheme = dashboardConfig.dashboardTheme
         widget._modelKey = modelKey
         widget._preferencesFile = prefFile
     end
@@ -250,6 +276,7 @@ function runtime.readWidgetSettings(widget)
         ofs3.session.modelPreferences = prefs
         ofs3.session.modelPreferencesFile = prefFile
         ofs3.session.batteryConfig = copyTable(battery)
+        setDashboardTheme(dashboardConfig.dashboardTheme)
     end
 
     return battery, prefs, prefFile, modelKey
@@ -259,6 +286,7 @@ function runtime.writeWidgetSettings(widget)
     local modelKey = (widget and widget._modelKey) or getModelKey()
     local prefs, prefFile = loadModelPreferencesData(modelKey)
     local battery = normalizeBatterySettings(widget or {})
+    local dashboardConfig = buildDashboardConfig({dashboard = {theme = widget and widget.dashboardTheme}})
 
     prefs.battery = prefs.battery or {}
     for key, value in pairs(battery) do
@@ -268,12 +296,19 @@ function runtime.writeWidgetSettings(widget)
         end
     end
 
+    prefs.dashboard = prefs.dashboard or {}
+    prefs.dashboard.theme = dashboardConfig.dashboardTheme
+    if widget then
+        widget.dashboardTheme = dashboardConfig.dashboardTheme
+    end
+
     ofs3.ini.save_ini_file(prefFile, prefs)
 
     if currentModelKey == modelKey then
         ofs3.session.modelPreferences = prefs
         ofs3.session.modelPreferencesFile = prefFile
         ofs3.session.batteryConfig = copyTable(battery)
+        setDashboardTheme(dashboardConfig.dashboardTheme)
     end
 
     return true
