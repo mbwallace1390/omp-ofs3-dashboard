@@ -50,15 +50,25 @@ function configui.configure(widget)
     local themes = ensureThemesModule()
     local themeList = themes.list()
     local themeValues = {}
-    for _, entry in ipairs(themeList) do
-        themeValues[#themeValues + 1] = {entry.name, entry.id}
+    for index, entry in ipairs(themeList) do
+        themeValues[#themeValues + 1] = {entry.name, index}
+    end
+
+    local function themeIndexForId(themeId)
+        for index, entry in ipairs(themeList) do
+            if entry.id == themeId then
+                return index
+            end
+        end
+        return 1
     end
 
     local themeLine = addLine(nil, "@i18n(widgets.dashboard.configure_theme)@")
     form.addChoiceField(themeLine, nil, themeValues, function()
-        return widget.dashboardTheme or themes.defaultId()
-    end, function(value)
-        widget.dashboardTheme = value
+        return themeIndexForId(widget.dashboardTheme or themes.defaultId())
+    end, function(index)
+        local entry = themeList[index]
+        widget.dashboardTheme = entry and entry.id or themes.defaultId()
     end)
 
     local cellsLine = addLine(nil, "@i18n(widgets.dashboard.configure_cell_count)@")
