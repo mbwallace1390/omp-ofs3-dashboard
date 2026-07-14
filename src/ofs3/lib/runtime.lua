@@ -59,6 +59,7 @@ local modelPreferenceDefaults = {
 local currentModelKey = nil
 local currentFlightMode = "preflight"
 local hasBeenInFlight = false
+local lastArmedRaw = nil
 local lastStatsAt = 0
 local currentTelemetryType = nil
 local lastTelemetryAvailable = nil
@@ -227,6 +228,7 @@ local function initializeModel(modelKey)
     currentTelemetryType = nil
     lastTelemetryAvailable = nil
     hasBeenInFlight = false
+    lastArmedRaw = nil
     lastStatsAt = 0
     channelSources = {}
     rxInitializedForProtocol = nil
@@ -452,7 +454,10 @@ end
 local function determineFlightMode()
     local rpm = telemetry.getSensor("rpm") or 0
     local armed = telemetry.getSensor("armed")
-    local inFlight = armed == 0 and rpm > 1000
+    local isArmedNow = armed == 0
+    local inFlight = isArmedNow and rpm > 1000
+    local wasArmed = lastArmedRaw
+    lastArmedRaw = armed
 
     if inFlight then
         hasBeenInFlight = true
@@ -460,6 +465,13 @@ local function determineFlightMode()
     end
 
     if hasBeenInFlight then
+        -- Re-arming after a completed flight (i.e. the pilot disarmed, then
+        -- armed again) starts a fresh preflight cycle instead of continuing
+        -- to show the previous flight's postflight summary.
+        if isArmedNow and wasArmed ~= nil and wasArmed ~= 0 then
+            hasBeenInFlight = false
+            return "preflight"
+        end
         return "postflight"
     end
 
@@ -577,6 +589,7 @@ end
 
 function runtime.resetFlight()
     hasBeenInFlight = false
+    lastArmedRaw = nil
     currentFlightMode = "preflight"
     ofs3.flightmode.current = "preflight"
     lastStatsAt = 0
