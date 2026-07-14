@@ -455,23 +455,33 @@ local function determineFlightMode()
     local rpm = telemetry.getSensor("rpm") or 0
     local armed = telemetry.getSensor("armed")
     local isArmedNow = armed == 0
-    local inFlight = isArmedNow and rpm > 1000
     local wasArmed = lastArmedRaw
     lastArmedRaw = armed
 
-    if inFlight then
-        hasBeenInFlight = true
-        return "inflight"
-    end
+    if isArmedNow then
+        -- Once inflight, stay inflight for as long as the aircraft remains
+        -- armed, regardless of headspeed dipping (autorotation, a hover
+        -- pause, idle-up transitions, etc.) - only disarming ends the flight.
+        if currentFlightMode == "inflight" then
+            hasBeenInFlight = true
+            return "inflight"
+        end
 
-    if hasBeenInFlight then
+        if rpm > 1000 then
+            hasBeenInFlight = true
+            return "inflight"
+        end
+
         -- Re-arming after a completed flight (i.e. the pilot disarmed, then
         -- armed again) starts a fresh preflight cycle instead of continuing
         -- to show the previous flight's postflight summary.
-        if isArmedNow and wasArmed ~= nil and wasArmed ~= 0 then
+        if hasBeenInFlight and wasArmed ~= nil and wasArmed ~= 0 then
             hasBeenInFlight = false
             return "preflight"
         end
+    end
+
+    if hasBeenInFlight then
         return "postflight"
     end
 
