@@ -69,7 +69,7 @@ local colorMode = {
 local theme_section = "system/@mwrc"
 local tx_section = "system/@default"
 
-local THEME_DEFAULTS = {rpm_min = 0, rpm_max = 2500, current_max = 120, esctemp_warn = 110, esctemp_max = 150}
+local THEME_DEFAULTS = {rpm_min = 0, rpm_max = 5800, current_max = 120, esctemp_warn = 110, esctemp_max = 150}
 local TX_DEFAULTS = {tx_min = 7.2, tx_warn = 7.4, tx_max = 8.4}
 
 local function getThemeValue(key)
