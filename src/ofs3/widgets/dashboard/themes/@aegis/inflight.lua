@@ -285,12 +285,14 @@ local function drawStateBadge(x, y, w, h, label, color)
     drawTextAligned(x + 10, y + 5, w - 18, label or "STATE --", "FONT_XS", color, "center")
 end
 
-local function drawMetric(x, y, w, h, title, valueText, accent, subtitle)
+local function drawMetric(x, y, w, h, title, valueText, accent, subtitle, valueFont)
     drawPanel(x, y, w, h, accent, title)
-    drawTextAligned(x + 12, y + 26, w - 24, valueText, "FONT_XL", C.white, "left")
+    lcd.setClipping(floor(x), floor(y), floor(w), floor(h))
+    drawTextAligned(x + 12, y + 26, w - 24, valueText, valueFont or "FONT_XL", C.white, "left")
     if subtitle then
         drawTextAligned(x + 12, y + h - 31, w - 24, subtitle, "FONT_XXS", C.muted, "left")
     end
+    lcd.setClipping(0, 0, lcd.getWindowSize())
 end
 
 local function drawSegments(x, y, w, h, percent, count, activeColor, emptyColor)
@@ -459,7 +461,7 @@ local function inflightPaint(x, y, w, h, box, c)
     local smallY = stateY + stateH + stateGap
     local smallH = floor((bodyY + bodyH - smallY - pad) / 2)
     drawMetric(rightX, smallY, rightW, smallH, "CURRENT LOAD", fmt(c.current, 1, " A"), C.violet, "instantaneous")
-    drawMetric(rightX, smallY + smallH + pad, rightW, smallH, "PACK / LINK", fmt(c.voltage, 1, " V") .. "   " .. fmt(c.link, 0, "%"), packColor == C.red and C.red or linkColor, "pack voltage and RF health")
+    drawMetric(rightX, smallY + smallH + pad, rightW, smallH, "PACK / LINK", fmt(c.voltage, 1, "V") .. "  " .. fmt(c.link, 0, "%"), packColor == C.red and C.red or linkColor, "pack voltage and RF health", "FONT_L")
 
     -- Keep consumed capacity inside the second vertical meter as two centered rows.
     local secondMeterY = bodyY + halfH + pad
