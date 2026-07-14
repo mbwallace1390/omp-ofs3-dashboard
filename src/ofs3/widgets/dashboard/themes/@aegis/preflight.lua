@@ -8,7 +8,9 @@
   - bec_voltage -> main pack voltage (cell-scaled min/warn/max via
     ofs3.session.batteryConfig, same convention as the other themes)
   - link/vfr -> rssi
-  - rate_profile/pid_profile check rows -> profile/rpm check rows
+  - rate_profile/pid_profile check rows -> profile/cell count check rows
+    (a headspeed readout isn't practical preflight, and pack voltage is
+    already shown elsewhere on this screen)
   - armflags/governor-driven arm state -> the real "armed" sensor
   See the PR description for the full list.
 ]] --
@@ -363,7 +365,7 @@ local function preflightWakeup(box, telemetry)
     c.esc = sensor(telemetry, "temp_esc")
     c.link = sensor(telemetry, "rssi", "link", "vfr")
     c.profile = sensor(telemetry, "profile")
-    c.rpm = sensor(telemetry, "rpm")
+    c.cellCount = ofs3.session.batteryConfig and ofs3.session.batteryConfig.batteryCellCount
     c.flightState, c.flightStateColor = getFlightState(telemetry)
 
     local packMin, packWarn = packMinV(), packWarnV()
@@ -530,7 +532,7 @@ local function preflightPaint(x, y, w, h, box, c)
 
     drawPanel(rightX, bodyY + cardH + pad, sideW, cardH, C.violet, "FLIGHT PROFILE")
     drawCheckRow(rightX + 14, bodyY + cardH + pad + 38, sideW - 28, "PID BANK", fmt(c.profile, 0, ""), C.violet)
-    drawCheckRow(rightX + 14, bodyY + cardH + pad + 70, sideW - 28, "HEADSPEED", fmt(c.rpm, 0, " rpm"), C.violet)
+    drawCheckRow(rightX + 14, bodyY + cardH + pad + 70, sideW - 28, "CELLS", fmt(c.cellCount, 0, "S"), C.violet)
     drawCheckRow(rightX + 14, bodyY + cardH + pad + 102, sideW - 28, "PACK", fmt(c.voltage, 1, " V"), C.cyan)
 end
 
