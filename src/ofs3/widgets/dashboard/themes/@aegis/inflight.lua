@@ -91,7 +91,7 @@ end
 
 local THEME_SECTION = "system/@aegis"
 local DEFAULTS = {
-    rpm_max = 2500,
+    rpm_max = 5800,
     esc_warn = 110,
     esc_max = 150,
     fuel_warn = 25,
