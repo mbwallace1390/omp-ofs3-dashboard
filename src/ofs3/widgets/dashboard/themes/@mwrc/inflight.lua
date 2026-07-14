@@ -575,7 +575,8 @@ local headerTextWidth2 = nil
 local headerTextWidth3 = nil
 local headerWatermarkWidth = nil
 
-local function paintHeaderLogo(x, y, w)
+local function paintHeaderLogo(x, y, w, h, box)
+    x, y = utils.applyOffset(x, y, box)
     if headerTextWidth1 == nil then
         lcd.font(FONT_L or 0)
         headerTextWidth1 = lcd.getTextSize(HEADER_TEXT_1)

@@ -77,11 +77,14 @@ local function getThemeValue(key)
     return THEME_DEFAULTS[key]
 end
 
+-- text/stats.lua's compileTransform ignores "decimals" for function
+-- transforms, so round explicitly here (utils.box just tostring()s
+-- whatever this returns).
 local function voltsPerCell(v)
     local cfg = ofs3.session.batteryConfig
     local cells = (cfg and cfg.batteryCellCount) or 3
     if cells <= 0 then cells = 3 end
-    return v / cells
+    return floor((v / cells) * 100 + 0.5) / 100
 end
 
 local EMPTY_CACHE = {}
@@ -157,7 +160,8 @@ local headerTextWidth2 = nil
 local headerTextWidth3 = nil
 local headerWatermarkWidth = nil
 
-local function paintHeaderLogo(x, y, w)
+local function paintHeaderLogo(x, y, w, h, box)
+    x, y = utils.applyOffset(x, y, box)
     if headerTextWidth1 == nil then
         lcd.font(FONT_L or 0)
         headerTextWidth1 = lcd.getTextSize(HEADER_TEXT_1)
@@ -496,7 +500,7 @@ local function buildBoxes(W)
             titlepos = "top", titlealign = "center", valuealign = "center",
             font = opts.font, titlefont = opts.titlefont, titlespacing = opts.tiletitlespacing, titlepaddingtop = opts.titlepaddingtop + 11,
             bgcolor = rc.panel, textcolor = rc.white, titlecolor = rc.cyan,
-            transform = voltsPerCell, decimals = 2
+            transform = voltsPerCell
         },
 
         -- One static overlay replaces the per-icon widgets.
