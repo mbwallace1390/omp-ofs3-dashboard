@@ -40,7 +40,7 @@ end
 local HEADER_TEXT_1 = "ETHOS "
 local HEADER_TEXT_2 = "// "
 local HEADER_TEXT_3 = "OFS3"
-local HEADER_WATERMARK = "AEGIS"
+local HEADER_WATERMARK = "MWRC"
 
 local function paintHeaderLogo(x, y, w, h, box)
     x, y = utils.applyOffset(x, y, box)
