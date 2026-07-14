@@ -131,7 +131,7 @@ local header_layout = {height = headeropts.height + topbarShiftY, cols = 7, rows
 
 local HEADER_TEXT_1 = "ETHOS "
 local HEADER_TEXT_2 = "// "
-local HEADER_TEXT_3 = "ROTORFLIGHT"
+local HEADER_TEXT_3 = "OFS3"
 local HEADER_WATERMARK = "MWRC"
 local headerTextWidth1 = nil
 local headerTextWidth2 = nil
