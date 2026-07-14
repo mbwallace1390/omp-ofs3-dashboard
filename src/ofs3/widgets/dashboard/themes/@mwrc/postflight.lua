@@ -157,27 +157,31 @@ local headerTextWidth2 = nil
 local headerTextWidth3 = nil
 local headerWatermarkWidth = nil
 
-local function paintHeaderLogo(x, y)
-    lcd.font(FONT_L or 0)
-
+local function paintHeaderLogo(x, y, w)
     if headerTextWidth1 == nil then
+        lcd.font(FONT_L or 0)
         headerTextWidth1 = lcd.getTextSize(HEADER_TEXT_1)
         headerTextWidth2 = lcd.getTextSize(HEADER_TEXT_2)
         headerTextWidth3 = lcd.getTextSize(HEADER_TEXT_3)
+        lcd.font(FONT_XS or FONT_XXS or 0)
+        headerWatermarkWidth = lcd.getTextSize(HEADER_WATERMARK)
     end
 
-    lcd.color(colorMode.accentcolor)
-    lcd.drawText(x + 5, y + 4, HEADER_TEXT_1)
-    lcd.color(rc.amber)
-    lcd.drawText(x + 5 + headerTextWidth1, y + 4, HEADER_TEXT_2)
-    lcd.color(colorMode.textcolor)
-    lcd.drawText(x + 5 + headerTextWidth1 + headerTextWidth2, y + 4, HEADER_TEXT_3)
+    local totalWidth = headerTextWidth1 + headerTextWidth2 + headerTextWidth3 + 10 + headerWatermarkWidth
+    local startX = x + max(5, floor(((w or 0) - totalWidth) / 2))
 
-    local watermarkX = x + 5 + headerTextWidth1 + headerTextWidth2 + headerTextWidth3 + 10
+    lcd.font(FONT_L or 0)
+    lcd.color(colorMode.accentcolor)
+    lcd.drawText(startX, y + 4, HEADER_TEXT_1)
+    lcd.color(rc.amber)
+    lcd.drawText(startX + headerTextWidth1, y + 4, HEADER_TEXT_2)
+    lcd.color(colorMode.textcolor)
+    lcd.drawText(startX + headerTextWidth1 + headerTextWidth2, y + 4, HEADER_TEXT_3)
+
+    local watermarkX = startX + headerTextWidth1 + headerTextWidth2 + headerTextWidth3 + 10
     lcd.color(rc.amber)
     lcd.drawLine(watermarkX - 5, y + 9, watermarkX - 5, y + 25)
     lcd.font(FONT_XS or FONT_XXS or 0)
-    if headerWatermarkWidth == nil then headerWatermarkWidth = lcd.getTextSize(HEADER_WATERMARK) end
     lcd.color(colorMode.accentcolor)
     lcd.drawText(watermarkX, y + 8, HEADER_WATERMARK)
 end
