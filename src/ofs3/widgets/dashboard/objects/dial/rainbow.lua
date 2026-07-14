@@ -12,7 +12,6 @@ local getParam = utils.getParam
 local resolveThresholdColor = utils.resolveThresholdColor
 local resolveThemeColor = utils.resolveThemeColor
 local resolveThemeColorArray = utils.resolveThemeColorArray
-local lastDisplayValue = nil
 
 function render.dirty(box)
     return utils.dirtyOnDisplayValueChange(box)
@@ -42,15 +41,60 @@ end
 
 local function calDialAngle(percent, startAngle, sweepAngle) return (startAngle or 135) + (sweepAngle or 270) * (percent or 0) end
 
-function render.wakeup(box)
+local function ensureCfg(box)
+    return utils.ensureCfg(box, function(cfg, box)
+        cfg.source = getParam(box, "source")
+        cfg.manualUnit = getParam(box, "unit")
+        cfg.min = getParam(box, "min") or 0
+        cfg.max = getParam(box, "max") or 100
 
+        local showvalue = getParam(box, "showvalue")
+        if showvalue == nil then showvalue = true end
+        cfg.showvalue = showvalue
+
+        cfg.titlepos = "bottom"
+        cfg.font = getParam(box, "font") or "FONT_STD"
+        cfg.textcolor = resolveThemeColor("textcolor", getParam(box, "textcolor"))
+        cfg.fillbgcolor = resolveThemeColor("fillbgcolor", getParam(box, "fillbgcolor"))
+        cfg.bgcolor = resolveThemeColor("bgcolor", getParam(box, "bgcolor"))
+        cfg.title = getParam(box, "title")
+        cfg.titlefont = getParam(box, "titlefont")
+        cfg.titlealign = getParam(box, "titlealign")
+        cfg.titlespacing = getParam(box, "titlespacing") or 0
+        cfg.titlecolor = resolveThemeColor("titlecolor", getParam(box, "titlecolor"))
+        cfg.titlepadding = getParam(box, "titlepadding")
+        cfg.titlepaddingleft = getParam(box, "titlepaddingleft")
+        cfg.titlepaddingright = getParam(box, "titlepaddingright")
+        cfg.titlepaddingtop = getParam(box, "titlepaddingtop")
+        cfg.titlepaddingbottom = getParam(box, "titlepaddingbottom")
+        cfg.valuealign = getParam(box, "valuealign")
+        cfg.valuepadding = getParam(box, "valuepadding")
+        cfg.valuepaddingleft = getParam(box, "valuepaddingleft")
+        cfg.valuepaddingright = getParam(box, "valuepaddingright")
+        cfg.valuepaddingtop = getParam(box, "valuepaddingtop")
+        cfg.valuepaddingbottom = getParam(box, "valuepaddingbottom")
+        cfg.bandlabeloffset = getParam(box, "bandlabeloffset") or 14
+        cfg.bandlabeloffsettop = getParam(box, "bandlabeloffsettop") or 8
+        cfg.bandlabelfont = getParam(box, "bandlabelfont") or "FONT_XS"
+        cfg.bandlabels = getParam(box, "bandlabels") or {"Low", "Med", "High"}
+        cfg.bandcolors = resolveThemeColorArray("fillcolor", getParam(box, "bandcolors") or {"red", "orange", "green"})
+        cfg.needlethickness = getParam(box, "needlethickness") or 5
+        cfg.needlehubsize = getParam(box, "needlehubsize") or 7
+        cfg.needlestartangle = getParam(box, "needlestartangle") or 150
+        cfg.needlesweepangle = getParam(box, "needlesweepangle") or 240
+        cfg.accentcolor = resolveThemeColor("accentcolor", getParam(box, "accentcolor"))
+    end)
+end
+
+function render.wakeup(box)
+    local cfg = ensureCfg(box)
     local telemetry = ofs3.tasks.telemetry
 
-    local source = getParam(box, "source")
+    local source = cfg.source
     local value, _, dynamicUnit
     if telemetry and source then value, _, dynamicUnit = telemetry.getSensor(source) end
 
-    local manualUnit = getParam(box, "unit")
+    local manualUnit = cfg.manualUnit
     local unit
 
     if manualUnit ~= nil then
@@ -63,8 +107,7 @@ function render.wakeup(box)
         unit = ""
     end
 
-    local min = getParam(box, "min") or 0
-    local max = getParam(box, "max") or 100
+    local min, max = cfg.min, cfg.max
     local percent = 0
     if value and max ~= min then
         percent = (value - min) / (max - min)
@@ -83,58 +126,22 @@ function render.wakeup(box)
         unit = nil
     end
 
-    local showvalue = getParam(box, "showvalue")
-    if showvalue == nil then showvalue = true end
-
     if type(displayValue) == "string" and displayValue:match("^%.+$") then unit = nil end
 
     box._currentDisplayValue = value
 
-    box._cache = {
-        value = value,
-        displayValue = displayValue,
-        percent = percent,
-        unit = unit,
-        min = min,
-        max = max,
-        showvalue = showvalue,
-        titlepos = "bottom",
-        font = getParam(box, "font") or "FONT_STD",
-        textcolor = resolveThemeColor("textcolor", getParam(box, "textcolor")),
-        fillbgcolor = resolveThemeColor("fillbgcolor", getParam(box, "fillbgcolor")),
-        bgcolor = resolveThemeColor("bgcolor", getParam(box, "bgcolor")),
-        title = getParam(box, "title"),
-        titlefont = getParam(box, "titlefont"),
-        titlealign = getParam(box, "titlealign"),
-        titlespacing = getParam(box, "titlespacing") or 0,
-        titlecolor = resolveThemeColor("titlecolor", getParam(box, "titlecolor")),
-        titlepadding = getParam(box, "titlepadding"),
-        titlepaddingleft = getParam(box, "titlepaddingleft"),
-        titlepaddingright = getParam(box, "titlepaddingright"),
-        titlepaddingtop = getParam(box, "titlepaddingtop"),
-        titlepaddingbottom = getParam(box, "titlepaddingbottom"),
-        valuealign = getParam(box, "valuealign"),
-        valuepadding = getParam(box, "valuepadding"),
-        valuepaddingleft = getParam(box, "valuepaddingleft"),
-        valuepaddingright = getParam(box, "valuepaddingright"),
-        valuepaddingtop = getParam(box, "valuepaddingtop"),
-        valuepaddingbottom = getParam(box, "valuepaddingbottom"),
-        bandlabeloffset = getParam(box, "bandlabeloffset") or 14,
-        bandlabeloffsettop = getParam(box, "bandlabeloffsettop") or 8,
-        bandlabelfont = getParam(box, "bandlabelfont") or "FONT_XS",
-        bandlabels = getParam(box, "bandlabels") or {"Low", "Med", "High"},
-        bandcolors = resolveThemeColorArray("fillcolor", getParam(box, "bandcolors") or {"red", "orange", "green"}),
-        needlethickness = getParam(box, "needlethickness") or 5,
-        needlehubsize = getParam(box, "needlehubsize") or 7,
-        needlestartangle = getParam(box, "needlestartangle") or 150,
-        needlesweepangle = getParam(box, "needlesweepangle") or 240,
-        accentcolor = resolveThemeColor("accentcolor", getParam(box, "accentcolor"))
-    }
+    box._dyn_value = value
+    box._dyn_displayValue = displayValue
+    box._dyn_percent = percent
+    box._dyn_unit = unit
 end
 
 function render.paint(x, y, w, h, box)
     x, y = utils.applyOffset(x, y, box)
-    local c = box._cache or {}
+    local c = box._cfg or {}
+    local percent = box._dyn_percent or 0
+    local displayValue = box._dyn_displayValue
+    local unit = box._dyn_unit
 
     lcd.font(_G[c.bandlabelfont] or FONT_XS)
     local subtextHeight = select(2, lcd.getTextSize("Med")) + 2
@@ -169,8 +176,8 @@ function render.paint(x, y, w, h, box)
 
     local needleHubYOffset = 6
 
-    if c.percent then
-        local angleDeg = calDialAngle(c.percent, c.needlestartangle or 150, c.needlesweepangle or 240)
+    if percent then
+        local angleDeg = calDialAngle(percent, c.needlestartangle or 150, c.needlesweepangle or 240)
         local needleLen = radius
         local cy_needle = cy
         utils.drawBarNeedle(cx, cy_needle, needleLen, c.needlethickness, angleDeg, c.accentcolor)
@@ -206,7 +213,7 @@ function render.paint(x, y, w, h, box)
         end
     end
 
-    utils.box(x, y, w, h, c.title, c.titlepos, c.titlealign, c.titlefont, c.titlespacing, c.titlecolor, c.titlepadding, c.titlepaddingleft, c.titlepaddingright, c.titlepaddingtop, c.titlepaddingbottom, c.showvalue ~= false and c.displayValue or nil, c.showvalue ~= false and c.unit or nil, c.font,
+    utils.box(x, y, w, h, c.title, c.titlepos, c.titlealign, c.titlefont, c.titlespacing, c.titlecolor, c.titlepadding, c.titlepaddingleft, c.titlepaddingright, c.titlepaddingtop, c.titlepaddingbottom, c.showvalue ~= false and displayValue or nil, c.showvalue ~= false and unit or nil, c.font,
         c.valuealign, c.textcolor, c.valuepadding, c.valuepaddingleft, c.valuepaddingright, c.valuepaddingtop, c.valuepaddingbottom, nil)
 end
 

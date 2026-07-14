@@ -30,17 +30,6 @@ function factory.createObjectWrapper(objectType, defaultSubtype)
 
         if not utils.isModelPrefsReady() then utils.resetBoxCache(box) end
 
-        if box.wakeupinterval ~= nil then
-            local now = clock()
-
-            box._wakeupInterval = box._wakeupInterval or box.wakeupinterval
-            box._lastWakeup = box._lastWakeup or 0
-
-            if now - box._lastWakeup < box._wakeupInterval then return end
-
-            box._lastWakeup = now
-        end
-
         local subtype = box.subtype or defaultSubtype
 
         if not renders[subtype] then
@@ -54,6 +43,22 @@ function factory.createObjectWrapper(objectType, defaultSubtype)
         end
 
         local render = renders[subtype]
+
+        -- box.wakeupinterval (theme-authored) takes priority; otherwise fall back to
+        -- the renderer's own default throttle (render.scheduler), if any.
+        local interval = box.wakeupinterval
+        if interval == nil then interval = render.scheduler end
+
+        if interval ~= nil then
+            local now = clock()
+
+            box._lastWakeup = box._lastWakeup or 0
+
+            if now - box._lastWakeup < interval then return end
+
+            box._lastWakeup = now
+        end
+
         render.wakeup(box)
     end
 

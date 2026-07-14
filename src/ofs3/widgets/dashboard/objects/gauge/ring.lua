@@ -12,33 +12,75 @@ local getParam = utils.getParam
 local resolveThemeColor = utils.resolveThemeColor
 local resolveThresholdColor = utils.resolveThresholdColor
 local drawArc = utils.drawArc
-local lastDisplayValue = nil
 
 function render.dirty(box)
     return utils.dirtyOnDisplayValueChange(box)
 end
 
-function render.wakeup(box)
+local function ensureCfg(box)
+    return utils.ensureCfg(box, function(cfg, box)
+        cfg.source = getParam(box, "source")
+        cfg.ringbatt = getParam(box, "ringbatt")
+        cfg.ringbattsubtext = getParam(box, "ringbattsubtext")
+        cfg.manualUnit = getParam(box, "unit")
+        cfg.novalue = getParam(box, "novalue") or "-"
+        cfg.thresholds = getParam(box, "thresholds")
 
+        cfg.fillbgcolor = resolveThemeColor("fillbgcolor", getParam(box, "fillbgcolor"))
+        cfg.bgcolor = resolveThemeColor("bgcolor", getParam(box, "bgcolor"))
+        cfg.titlecolor = resolveThemeColor("titlecolor", getParam(box, "titlecolor"))
+
+        cfg.title = getParam(box, "title")
+        cfg.titlepos = getParam(box, "titlepos") or (cfg.title and "top")
+        cfg.titlealign = getParam(box, "titlealign")
+        cfg.titlefont = getParam(box, "titlefont")
+        cfg.titlespacing = getParam(box, "titlespacing")
+        cfg.titlepadding = getParam(box, "titlepadding")
+        cfg.titlepaddingleft = getParam(box, "titlepaddingleft")
+        cfg.titlepaddingright = getParam(box, "titlepaddingright")
+        cfg.titlepaddingtop = getParam(box, "titlepaddingtop")
+        cfg.titlepaddingbottom = getParam(box, "titlepaddingbottom")
+
+        cfg.font = getParam(box, "font") or "FONT_STD"
+        cfg.decimals = getParam(box, "decimals")
+        cfg.valuealign = getParam(box, "valuealign")
+        cfg.valuepadding = getParam(box, "valuepadding")
+        cfg.valuepaddingleft = getParam(box, "valuepaddingleft")
+        cfg.valuepaddingright = getParam(box, "valuepaddingright")
+        cfg.valuepaddingtop = getParam(box, "valuepaddingtop")
+        cfg.valuepaddingbottom = getParam(box, "valuepaddingbottom")
+        cfg.thickness = getParam(box, "thickness")
+        cfg.innerringcolor = resolveThemeColor("innerringcolor", getParam(box, "innerringcolor") or "white")
+        cfg.innerringthickness = getParam(box, "innerringthickness") or 8
+        cfg.ringbattsubalign = getParam(box, "ringbattsubalign")
+        cfg.ringbattsubpadding = getParam(box, "ringbattsubpadding") or 2
+        cfg.ringbattsubpaddingleft = getParam(box, "ringbattsubpaddingleft")
+        cfg.ringbattsubpaddingright = getParam(box, "ringbattsubpaddingright")
+        cfg.ringbattsubpaddingtop = getParam(box, "ringbattsubpaddingtop")
+        cfg.ringbattsubpaddingbottom = getParam(box, "ringbattsubpaddingbottom")
+        cfg.ringbattsubfont = getParam(box, "ringbattsubfont") or "FONT_XS"
+    end)
+end
+
+function render.wakeup(box)
+    local cfg = ensureCfg(box)
     local telemetry = ofs3.tasks.telemetry
 
-    local source = getParam(box, "source")
+    local source = cfg.source
     local value, _, dynamicUnit
     if telemetry and source then value, _, dynamicUnit = telemetry.getSensor(source) end
 
-    local ringbatt = getParam(box, "ringbatt")
+    local ringbatt = cfg.ringbatt
     local percent = 0
     local mahUnit = ""
-    local fuel = 0
-    local consumption = 0
 
     if ringbatt and telemetry and telemetry.getSensor then
-        fuel = telemetry.getSensor("fuel") or 0
-        consumption = telemetry.getSensor("consumption") or 0
+        local fuel = telemetry.getSensor("fuel") or 0
+        local consumption = telemetry.getSensor("consumption") or 0
         percent = math.max(0, math.min(1, fuel / 100))
         mahUnit = string.format("%dmah", math.floor(consumption + 0.5))
 
-        local override = getParam(box, "ringbattsubtext")
+        local override = cfg.ringbattsubtext
         if override == "" or override == false then
             mahUnit = nil
         elseif override then
@@ -46,7 +88,7 @@ function render.wakeup(box)
         end
     end
 
-    local manualUnit = getParam(box, "unit")
+    local manualUnit = cfg.manualUnit
     local unit
 
     if manualUnit ~= nil then
@@ -75,55 +117,24 @@ function render.wakeup(box)
 
     box._currentDisplayValue = value
 
-    box._cache = {
-        value = value,
-        displayValue = displayValue,
-        unit = unit,
-        ringbatt = ringbatt,
-        percent = percent,
-        mahUnit = mahUnit,
-        novalue = getParam(box, "novalue") or "-",
-        fillcolor = resolveThresholdColor(value, box, "fillcolor", "fillcolor", getParam(box, "thresholds")),
-        textcolor = resolveThresholdColor(value, box, "textcolor", "textcolor", thresholds),
-        fillbgcolor = resolveThemeColor("fillbgcolor", getParam(box, "fillbgcolor")),
-        bgcolor = resolveThemeColor("bgcolor", getParam(box, "bgcolor")),
-        titlecolor = resolveThemeColor("titlecolor", getParam(box, "titlecolor")),
-        thresholds = getParam(box, "thresholds"),
-        title = getParam(box, "title"),
-        titlepos = getParam(box, "titlepos") or (getParam(box, "title") and "top"),
-        titlealign = getParam(box, "titlealign"),
-        titlefont = getParam(box, "titlefont"),
-        titlespacing = getParam(box, "titlespacing"),
-        titlepadding = getParam(box, "titlepadding"),
-        titlepaddingleft = getParam(box, "titlepaddingleft"),
-        titlepaddingright = getParam(box, "titlepaddingright"),
-        titlepaddingtop = getParam(box, "titlepaddingtop"),
-        titlepaddingbottom = getParam(box, "titlepaddingbottom"),
-        font = getParam(box, "font") or "FONT_STD",
-        decimals = getParam(box, "decimals"),
-        valuealign = getParam(box, "valuealign"),
-        valuepadding = getParam(box, "valuepadding"),
-        valuepaddingleft = getParam(box, "valuepaddingleft"),
-        valuepaddingright = getParam(box, "valuepaddingright"),
-        valuepaddingtop = getParam(box, "valuepaddingtop"),
-        valuepaddingbottom = getParam(box, "valuepaddingbottom"),
-        thickness = getParam(box, "thickness"),
-        innerringcolor = resolveThemeColor("innerringcolor", getParam(box, "innerringcolor") or "white"),
-        innerringthickness = getParam(box, "innerringthickness") or 8,
-        ringbattsubalign = getParam(box, "ringbattsubalign"),
-        ringbattsubpadding = getParam(box, "ringbattsubpadding") or 2,
-        ringbattsubpaddingleft = getParam(box, "ringbattsubpaddingleft"),
-        ringbattsubpaddingright = getParam(box, "ringbattsubpaddingright"),
-        ringbattsubpaddingtop = getParam(box, "ringbattsubpaddingtop"),
-        ringbattsubpaddingbottom = getParam(box, "ringbattsubpaddingbottom"),
-        ringbattsubfont = getParam(box, "ringbattsubfont") or "FONT_XS"
-    }
-
+    box._dyn_value = value
+    box._dyn_displayValue = displayValue
+    box._dyn_unit = unit
+    box._dyn_percent = percent
+    box._dyn_mahUnit = mahUnit
+    box._dyn_fillcolor = resolveThresholdColor(value, box, "fillcolor", "fillcolor", cfg.thresholds)
+    box._dyn_textcolor = resolveThresholdColor(value, box, "textcolor", "textcolor", cfg.thresholds)
 end
 
 function render.paint(x, y, w, h, box)
     x, y = utils.applyOffset(x, y, box)
-    local c = box._cache or {}
+    local c = box._cfg or {}
+    local percent = box._dyn_percent or 0
+    local fillcolor = box._dyn_fillcolor
+    local textcolor = box._dyn_textcolor
+    local mahUnit = box._dyn_mahUnit
+    local displayValue = box._dyn_displayValue
+    local unit = box._dyn_unit
 
     if c.bgcolor then
         lcd.color(c.bgcolor)
@@ -158,20 +169,20 @@ function render.paint(x, y, w, h, box)
 
         drawArc(cx, cy, radius, thickness, 0, 360, c.fillbgcolor)
 
-        local startAngle = 360 - (c.percent * 360)
-        drawArc(cx, cy, radius, thickness, startAngle, 360, c.fillcolor)
+        local startAngle = 360 - (percent * 360)
+        drawArc(cx, cy, radius, thickness, startAngle, 360, fillcolor)
 
         drawArc(cx, cy, radius - thickness, c.innerringthickness, 0, 360, c.innerringcolor)
     else
 
         drawArc(cx, cy, radius, thickness, 0, 360, c.fillbgcolor)
-        drawArc(cx, cy, radius, thickness, 0, 360, c.fillcolor)
+        drawArc(cx, cy, radius, thickness, 0, 360, fillcolor)
     end
 
-    if c.ringbatt and c.mahUnit then
+    if c.ringbatt and mahUnit then
 
         lcd.font(_G[c.ringbattsubfont] or FONT_XS)
-        local tw, th = lcd.getTextSize(c.mahUnit)
+        local tw, th = lcd.getTextSize(mahUnit)
 
         local padL = c.ringbattsubpaddingleft or c.ringbattsubpadding or 0
         local padR = c.ringbattsubpaddingright or c.ringbattsubpadding or 0
@@ -193,11 +204,11 @@ function render.paint(x, y, w, h, box)
         local textY = centerY + mainH / 2 + padT - padB
 
         lcd.font(_G[c.ringbattsubfont] or FONT_XS)
-        lcd.color(c.textcolor)
-        lcd.drawText(textX, textY, c.mahUnit)
+        lcd.color(textcolor)
+        lcd.drawText(textX, textY, mahUnit)
     end
 
-    utils.box(x, y, w, h, c.title, c.titlepos, c.titlealign, c.titlefont, c.titlespacing, c.titlecolor, c.titlepadding, c.titlepaddingleft, c.titlepaddingright, c.titlepaddingtop, c.titlepaddingbottom, c.displayValue, c.unit, c.font, c.valuealign, c.textcolor, c.valuepadding, c.valuepaddingleft,
+    utils.box(x, y, w, h, c.title, c.titlepos, c.titlealign, c.titlefont, c.titlespacing, c.titlecolor, c.titlepadding, c.titlepaddingleft, c.titlepaddingright, c.titlepaddingtop, c.titlepaddingbottom, displayValue, unit, c.font, c.valuealign, textcolor, c.valuepadding, c.valuepaddingleft,
         c.valuepaddingright, c.valuepaddingtop, c.valuepaddingbottom, nil)
 end
 

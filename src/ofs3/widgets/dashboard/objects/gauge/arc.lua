@@ -12,30 +12,73 @@ local getParam = utils.getParam
 local resolveThemeColor = utils.resolveThemeColor
 local resolveThresholdColor = utils.resolveThresholdColor
 local drawArc = utils.drawArc
-local lastDisplayValue = nil
 
 function render.dirty(box)
     return utils.dirtyOnDisplayValueChange(box)
 end
 
-function render.wakeup(box)
+local function ensureCfg(box)
+    return utils.ensureCfg(box, function(cfg, box)
+        cfg.source = getParam(box, "source")
+        cfg.arcmax = getParam(box, "arcmax") == true
+        cfg.manualUnit = getParam(box, "unit")
+        cfg.rawMin = getParam(box, "min") or 0
+        cfg.rawMax = getParam(box, "max") or 100
+        cfg.thresholds = getParam(box, "thresholds")
 
+        cfg.fillbgcolor = resolveThemeColor("fillbgcolor", getParam(box, "fillbgcolor"))
+        cfg.bgcolor = resolveThemeColor("bgcolor", getParam(box, "bgcolor"))
+        cfg.titlecolor = resolveThemeColor("titlecolor", getParam(box, "titlecolor"))
+
+        cfg.title = getParam(box, "title")
+        cfg.titlepos = getParam(box, "titlepos") or (cfg.title and "top")
+        cfg.titlealign = getParam(box, "titlealign")
+        cfg.titlefont = getParam(box, "titlefont")
+        cfg.titlespacing = getParam(box, "titlespacing") or 0
+        cfg.titlepadding = getParam(box, "titlepadding")
+        cfg.titlepaddingleft = getParam(box, "titlepaddingleft")
+        cfg.titlepaddingright = getParam(box, "titlepaddingright")
+        cfg.titlepaddingtop = getParam(box, "titlepaddingtop")
+        cfg.titlepaddingbottom = getParam(box, "titlepaddingbottom")
+
+        cfg.font = getParam(box, "font") or "FONT_STD"
+        cfg.maxfont = getParam(box, "maxfont") or "FONT_S"
+        cfg.decimals = getParam(box, "decimals")
+        cfg.valuealign = getParam(box, "valuealign")
+        cfg.valuepadding = getParam(box, "valuepadding")
+        cfg.valuepaddingleft = getParam(box, "valuepaddingleft")
+        cfg.valuepaddingright = getParam(box, "valuepaddingright")
+        cfg.valuepaddingtop = getParam(box, "valuepaddingtop") or 18
+        cfg.valuepaddingbottom = getParam(box, "valuepaddingbottom")
+
+        cfg.thickness = getParam(box, "thickness")
+        cfg.maxprefix = getParam(box, "maxprefix") or "+"
+        cfg.maxpadding = getParam(box, "maxpadding") or 0
+        cfg.maxpaddingleft = getParam(box, "maxpaddingleft") or 0
+        cfg.maxpaddingtop = getParam(box, "maxpaddingtop") or 0
+        cfg.gaugepadding = getParam(box, "gaugepadding") or 0
+        cfg.gaugepaddingbottom = getParam(box, "gaugepaddingbottom") or 0
+    end)
+end
+
+function render.wakeup(box)
+    local cfg = ensureCfg(box)
     local telemetry = ofs3.tasks.telemetry
 
-    local source = getParam(box, "source")
+    local source = cfg.source
     local value, _, dynamicUnit
     if telemetry and source then value, _, dynamicUnit = telemetry.getSensor(source) end
 
-    local arcmax = getParam(box, "arcmax") == true
+    local arcmax = cfg.arcmax
     local maxval = nil
     if arcmax and source then
         local stats = ofs3.tasks.telemetry.getSensorStats(source)
         local currentMax = stats and stats.max or nil
-        local prevMax = box._cache and box._cache.maxval or nil
+        local prevMax = box._dyn_maxval
         maxval = currentMax or prevMax
     end
 
-    local manualUnit = getParam(box, "unit")
+    local manualUnit = cfg.manualUnit
     local unit
 
     if manualUnit ~= nil then
@@ -48,8 +91,8 @@ function render.wakeup(box)
         unit = ""
     end
 
-    local min = getParam(box, "min") or 0
-    local max = getParam(box, "max") or 100
+    local min = cfg.rawMin
+    local max = cfg.rawMax
 
     local isFahrenheit = unit and unit:match("F$") ~= nil
     local isFeet = unit and unit:lower():match("ft$") ~= nil
@@ -64,7 +107,7 @@ function render.wakeup(box)
         if arcmax and maxval then maxval = maxval * 3.28084 end
     end
 
-    local thresholds = getParam(box, "thresholds")
+    local thresholds = cfg.thresholds
     local adjustedThresholds = thresholds
 
     if thresholds and (isFahrenheit or isFeet) then
@@ -113,56 +156,34 @@ function render.wakeup(box)
 
     box._currentDisplayValue = value
 
-    box._cache = {
-        value = value,
-        maxval = maxval,
-        displayValue = displayValue,
-        displayMaxValue = displayMaxValue,
-        arcmax = arcmax,
-        min = min,
-        max = max,
-        percent = percent,
-        maxPercent = maxPercent,
-        unit = unit,
-        textcolor = resolveThresholdColor(value, box, "textcolor", "textcolor", adjustedThresholds),
-        maxtextcolor = resolveThresholdColor(maxval, box, "maxtextcolor", "textcolor", adjustedThresholds),
-        fillcolor = resolveThresholdColor(value, box, "fillcolor", "fillcolor", adjustedThresholds),
-        maxfillcolor = resolveThresholdColor(maxval, box, "fillcolor", "fillcolor", adjustedThresholds),
-        fillbgcolor = resolveThemeColor("fillbgcolor", getParam(box, "fillbgcolor")),
-        bgcolor = resolveThemeColor("bgcolor", getParam(box, "bgcolor")),
-        titlecolor = resolveThemeColor("titlecolor", getParam(box, "titlecolor")),
-        title = getParam(box, "title"),
-        titlepos = getParam(box, "titlepos") or (getParam(box, "title") and "top"),
-        titlealign = getParam(box, "titlealign"),
-        titlefont = getParam(box, "titlefont"),
-        titlespacing = getParam(box, "titlespacing") or 0,
-        titlepadding = getParam(box, "titlepadding"),
-        titlepaddingleft = getParam(box, "titlepaddingleft"),
-        titlepaddingright = getParam(box, "titlepaddingright"),
-        titlepaddingtop = getParam(box, "titlepaddingtop"),
-        titlepaddingbottom = getParam(box, "titlepaddingbottom"),
-        font = getParam(box, "font") or "FONT_STD",
-        maxfont = getParam(box, "maxfont") or "FONT_S",
-        decimals = getParam(box, "decimals"),
-        valuealign = getParam(box, "valuealign"),
-        valuepadding = getParam(box, "valuepadding"),
-        valuepaddingleft = getParam(box, "valuepaddingleft"),
-        valuepaddingright = getParam(box, "valuepaddingright"),
-        valuepaddingtop = getParam(box, "valuepaddingtop") or 18,
-        valuepaddingbottom = getParam(box, "valuepaddingbottom"),
-        thickness = getParam(box, "thickness"),
-        maxprefix = getParam(box, "maxprefix") or "+",
-        maxpadding = getParam(box, "maxpadding") or 0,
-        maxpaddingleft = getParam(box, "maxpaddingleft") or 0,
-        maxpaddingtop = getParam(box, "maxpaddingtop") or 0,
-        gaugepadding = getParam(box, "gaugepadding") or 0,
-        gaugepaddingbottom = getParam(box, "gaugepaddingbottom") or 0
-    }
+    box._dyn_value = value
+    box._dyn_maxval = maxval
+    box._dyn_displayValue = displayValue
+    box._dyn_displayMaxValue = displayMaxValue
+    box._dyn_arcmax = arcmax
+    box._dyn_min = min
+    box._dyn_max = max
+    box._dyn_percent = percent
+    box._dyn_maxPercent = maxPercent
+    box._dyn_unit = unit
+    box._dyn_textcolor = resolveThresholdColor(value, box, "textcolor", "textcolor", adjustedThresholds)
+    box._dyn_maxtextcolor = resolveThresholdColor(maxval, box, "maxtextcolor", "textcolor", adjustedThresholds)
+    box._dyn_fillcolor = resolveThresholdColor(value, box, "fillcolor", "fillcolor", adjustedThresholds)
+    box._dyn_maxfillcolor = resolveThresholdColor(maxval, box, "fillcolor", "fillcolor", adjustedThresholds)
 end
 
 function render.paint(x, y, w, h, box)
     x, y = utils.applyOffset(x, y, box)
-    local c = box._cache or {}
+    local c = box._cfg or {}
+
+    local percent = box._dyn_percent or 0
+    local arcmax = box._dyn_arcmax
+    local maxval = box._dyn_maxval
+    local max = box._dyn_max
+    local min = box._dyn_min
+    local maxPercent = box._dyn_maxPercent or 0
+    local fillcolor = box._dyn_fillcolor
+    local maxfillcolor = box._dyn_maxfillcolor
 
     local titleHeight = 0
     if c.title then
@@ -204,24 +225,24 @@ function render.paint(x, y, w, h, box)
 
     drawArc(cx, cy, radius, thickness, startAngle, endAngle, c.fillbgcolor)
 
-    if c.percent and c.percent > 0 then
-        local valueEndAngle = (startAngle + 270 * c.percent) % 360
-        drawArc(cx, cy, radius, thickness, startAngle, valueEndAngle, c.fillcolor)
+    if percent and percent > 0 then
+        local valueEndAngle = (startAngle + 270 * percent) % 360
+        drawArc(cx, cy, radius, thickness, startAngle, valueEndAngle, fillcolor)
     end
 
-    if c.arcmax and c.maxval and c.max ~= c.min and c.maxPercent > 0 then
+    if arcmax and maxval and max ~= min and maxPercent > 0 then
         local innerRadius = radius * 0.74
         local innerThickness = thickness * 0.8
-        local maxEndAngle = (startAngle + 270 * c.maxPercent) % 360
-        drawArc(cx, cy, innerRadius, innerThickness, startAngle, maxEndAngle, c.maxfillcolor)
+        local maxEndAngle = (startAngle + 270 * maxPercent) % 360
+        drawArc(cx, cy, innerRadius, innerThickness, startAngle, maxEndAngle, maxfillcolor)
     end
 
-    utils.box(x, y, w, h, c.title, c.titlepos, c.titlealign, c.titlefont, c.titlespacing, c.titlecolor, c.titlepadding, c.titlepaddingleft, c.titlepaddingright, c.titlepaddingtop, c.titlepaddingbottom, c.displayValue, c.unit, c.font, c.valuealign, c.textcolor, c.valuepadding, c.valuepaddingleft,
-        c.valuepaddingright, c.valuepaddingtop, c.valuepaddingbottom, nil)
+    utils.box(x, y, w, h, c.title, c.titlepos, c.titlealign, c.titlefont, c.titlespacing, c.titlecolor, c.titlepadding, c.titlepaddingleft, c.titlepaddingright, c.titlepaddingtop, c.titlepaddingbottom, box._dyn_displayValue, box._dyn_unit, c.font, c.valuealign, box._dyn_textcolor, c.valuepadding,
+        c.valuepaddingleft, c.valuepaddingright, c.valuepaddingtop, c.valuepaddingbottom, nil)
 
-    if c.arcmax and c.maxval then
-        local maxStr = tostring(c.maxprefix or "") .. (c.displayMaxValue or c.maxval) .. (c.unit or "")
-        local maxTextColor = c.maxtextcolor or c.textcolor
+    if arcmax and maxval then
+        local maxStr = tostring(c.maxprefix or "") .. (box._dyn_displayMaxValue or maxval) .. (box._dyn_unit or "")
+        local maxTextColor = box._dyn_maxtextcolor or box._dyn_textcolor
         lcd.color(maxTextColor)
         lcd.font(_G[c.maxfont] or FONT_S)
         local tw2, th2 = lcd.getTextSize(maxStr)

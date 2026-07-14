@@ -84,11 +84,18 @@ local function copyTable(input)
     return out
 end
 
+local lastModelKeyRaw
+local lastModelKeySanitized
+
 local function getModelKey()
     local path = model.path and model.path() or ""
     local name = model.name and model.name() or ""
     local raw = path ~= "" and path or name
-    return ofs3.utils.sanitize_filename(raw)
+    if raw ~= lastModelKeyRaw then
+        lastModelKeyRaw = raw
+        lastModelKeySanitized = ofs3.utils.sanitize_filename(raw)
+    end
+    return lastModelKeySanitized
 end
 
 local function normalizeSourceState(state)

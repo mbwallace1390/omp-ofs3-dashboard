@@ -9,6 +9,54 @@ local utils = {}
 
 local imageCache = {}
 local fontCache
+local cachedMinValueFontH
+local NAMED_COLORS = {
+    red = {255, 0, 0},
+    green = {0, 188, 4},
+    blue = {0, 122, 255},
+    white = {255, 255, 255},
+    black = {0, 0, 0},
+    gray = {185, 185, 185},
+    grey = {185, 185, 185},
+    orange = {255, 165, 0},
+    yellow = {255, 255, 0},
+    cyan = {0, 255, 255},
+    magenta = {255, 0, 255},
+    pink = {255, 105, 180},
+    purple = {128, 0, 128},
+    violet = {143, 0, 255},
+    brown = {139, 69, 19},
+    lime = {0, 255, 0},
+    olive = {128, 128, 0},
+    gold = {255, 215, 0},
+    silver = {192, 192, 192},
+    teal = {0, 128, 128},
+    navy = {0, 0, 128},
+    maroon = {128, 0, 0},
+    beige = {245, 245, 220},
+    turquoise = {64, 224, 208},
+    indigo = {75, 0, 130},
+    coral = {255, 127, 80},
+    salmon = {250, 128, 114},
+    mint = {62, 180, 137},
+    lightgreen = {144, 238, 144},
+    darkgreen = {0, 100, 0},
+    lightred = {255, 102, 102},
+    darkred = {139, 0, 0},
+    lightorange = {255, 200, 100},
+    lightblue = {173, 216, 230},
+    darkblue = {0, 0, 139},
+    lightpurple = {216, 191, 216},
+    darkpurple = {48, 25, 52},
+    lightyellow = {255, 255, 224},
+    darkyellow = {204, 204, 0},
+    lightgrey = {211, 211, 211},
+    lightgray = {211, 211, 211},
+    darkgrey = {90, 90, 90},
+    darkgray = {90, 90, 90},
+    lmgrey = {80, 80, 80},
+    darkwhite = {245, 245, 245}
+}
 local GAUGE_TRAFFIC_GREEN = lcd.RGB(0, 188, 4)
 local GAUGE_TRAFFIC_AMBER = lcd.RGB(255, 170, 0)
 local GAUGE_TRAFFIC_RED = lcd.RGB(224, 64, 64)
@@ -611,53 +659,7 @@ end
 
 function utils.resolveColor(value, variantFactor)
 
-    local namedColors = {
-        red = {255, 0, 0},
-        green = {0, 188, 4},
-        blue = {0, 122, 255},
-        white = {255, 255, 255},
-        black = {0, 0, 0},
-        gray = {185, 185, 185},
-        grey = {185, 185, 185},
-        orange = {255, 165, 0},
-        yellow = {255, 255, 0},
-        cyan = {0, 255, 255},
-        magenta = {255, 0, 255},
-        pink = {255, 105, 180},
-        purple = {128, 0, 128},
-        violet = {143, 0, 255},
-        brown = {139, 69, 19},
-        lime = {0, 255, 0},
-        olive = {128, 128, 0},
-        gold = {255, 215, 0},
-        silver = {192, 192, 192},
-        teal = {0, 128, 128},
-        navy = {0, 0, 128},
-        maroon = {128, 0, 0},
-        beige = {245, 245, 220},
-        turquoise = {64, 224, 208},
-        indigo = {75, 0, 130},
-        coral = {255, 127, 80},
-        salmon = {250, 128, 114},
-        mint = {62, 180, 137},
-        lightgreen = {144, 238, 144},
-        darkgreen = {0, 100, 0},
-        lightred = {255, 102, 102},
-        darkred = {139, 0, 0},
-        lightorange = {255, 200, 100},
-        lightblue = {173, 216, 230},
-        darkblue = {0, 0, 139},
-        lightpurple = {216, 191, 216},
-        darkpurple = {48, 25, 52},
-        lightyellow = {255, 255, 224},
-        darkyellow = {204, 204, 0},
-        lightgrey = {211, 211, 211},
-        lightgray = {211, 211, 211},
-        darkgrey = {90, 90, 90},
-        darkgray = {90, 90, 90},
-        lmgrey = {80, 80, 80},
-        darkwhite = {245, 245, 245}
-    }
+    local namedColors = NAMED_COLORS
 
     local VARIANT_FACTOR = type(variantFactor) == "number" and math.max(0, math.min(1, variantFactor)) or 0.3
 
@@ -758,16 +760,23 @@ function utils.box(x, y, w, h, title, titlepos, titlealign, titlefont, titlespac
         lcd.drawFilledRectangle(x, y, w, h)
     end
 
-    if not fontCache then fontCache = utils.getFontListsForResolution() end
+    if not fontCache then
+        fontCache = utils.getFontListsForResolution()
+        cachedMinValueFontH = nil
+    end
 
     local actualTitleFont, tsizeW, tsizeH = nil, 0, 0
     if title then
-        local minValueFontH = 9999
-        for _, vf in ipairs(fontCache.value_default or {FONT_STD}) do
-            lcd.font(vf)
-            local _, vh = lcd.getTextSize("8")
-            if vh < minValueFontH then minValueFontH = vh end
+        if not cachedMinValueFontH then
+            local minValueFontH = 9999
+            for _, vf in ipairs(fontCache.value_default or {FONT_STD}) do
+                lcd.font(vf)
+                local _, vh = lcd.getTextSize("8")
+                if vh < minValueFontH then minValueFontH = vh end
+            end
+            cachedMinValueFontH = minValueFontH
         end
+        local minValueFontH = cachedMinValueFontH
         if titlefont and _G[titlefont] then
             actualTitleFont = _G[titlefont]
             lcd.font(actualTitleFont)
@@ -858,10 +867,16 @@ function utils.box(x, y, w, h, title, titlepos, titlealign, titlefont, titlespac
 
             bestW, bestH = lcd.getTextSize(value_str_calc)
         else
+            -- fontCache.value_default is ordered smallest-to-largest, and text size grows
+            -- monotonically with font size, so once a font no longer fits, larger ones won't either.
             for _, tryFont in ipairs(fontCache.value_default) do
                 lcd.font(tryFont)
                 local tW, tH = lcd.getTextSize(value_str_calc)
-                if tW <= region_vw and tH <= region_vh then valueFont, bestW, bestH = tryFont, tW, tH end
+                if tW <= region_vw and tH <= region_vh then
+                    valueFont, bestW, bestH = tryFont, tW, tH
+                else
+                    break
+                end
             end
             lcd.font(valueFont)
         end

@@ -15,7 +15,8 @@ local supportedResolutions = {
 
 local currentState = nil
 local loadedStates = {}
-local lastSizeKey = nil
+local lastWindowW = nil
+local lastWindowH = nil
 local themeStateSignature = nil
 local nextThemeStateCheck = 0
 local themeStateCheckInterval = 0.25
@@ -275,21 +276,28 @@ end
 
 local function ensureState()
     local nextState = ofs3.flightmode.current or "preflight"
+    local needsRects = false
+
     if nextState ~= currentState then
         currentState = nextState
         local module = loadedStates[currentState]
         loadObjects(module)
         forceFullRepaint = true
+        needsRects = true
     end
 
     local width, height = lcd.getWindowSize()
-    local sizeKey = string.format("%dx%d", width, height)
-    if sizeKey ~= lastSizeKey then
-        lastSizeKey = sizeKey
+    if width ~= lastWindowW or height ~= lastWindowH then
+        lastWindowW = width
+        lastWindowH = height
         forceFullRepaint = true
+        needsRects = true
     end
 
-    buildRects(loadedStates[currentState])
+    if needsRects or #dashboard.boxRects == 0 then
+        buildRects(loadedStates[currentState])
+    end
+
     return loadedStates[currentState]
 end
 
