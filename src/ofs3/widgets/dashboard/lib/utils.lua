@@ -450,14 +450,15 @@ end
 
 function utils.drawBarNeedle(cx, cy, length, thickness, angleDeg, color)
     local angleRad = math.rad(angleDeg)
-    local step = 1
     local rad_thick = thickness / 2
+    local dx, dy = math.cos(angleRad), math.sin(angleRad)
+    local ox, oy = -dy * rad_thick, dx * rad_thick
+    local tipX, tipY = cx + dx * length, cy + dy * length
+
     lcd.color(color)
-    for i = 0, length, step do
-        local px = cx + i * math.cos(angleRad)
-        local py = cy + i * math.sin(angleRad)
-        lcd.drawFilledCircle(px, py, rad_thick)
-    end
+    lcd.drawFilledTriangle(cx - ox, cy - oy, cx + ox, cy + oy, tipX + ox, tipY + oy)
+    lcd.drawFilledTriangle(cx - ox, cy - oy, tipX + ox, tipY + oy, tipX - ox, tipY - oy)
+    lcd.drawFilledCircle(tipX, tipY, rad_thick)
 end
 
 function utils.getFontListsForResolution()
