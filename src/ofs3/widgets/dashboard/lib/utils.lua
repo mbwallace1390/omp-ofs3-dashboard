@@ -450,14 +450,15 @@ end
 
 function utils.drawBarNeedle(cx, cy, length, thickness, angleDeg, color)
     local angleRad = math.rad(angleDeg)
-    local step = 1
     local rad_thick = thickness / 2
+    local dx, dy = math.cos(angleRad), math.sin(angleRad)
+    local ox, oy = -dy * rad_thick, dx * rad_thick
+    local tipX, tipY = cx + dx * length, cy + dy * length
+
     lcd.color(color)
-    for i = 0, length, step do
-        local px = cx + i * math.cos(angleRad)
-        local py = cy + i * math.sin(angleRad)
-        lcd.drawFilledCircle(px, py, rad_thick)
-    end
+    lcd.drawFilledTriangle(cx - ox, cy - oy, cx + ox, cy + oy, tipX + ox, tipY + oy)
+    lcd.drawFilledTriangle(cx - ox, cy - oy, tipX + ox, tipY + oy, tipX - ox, tipY - oy)
+    lcd.drawFilledCircle(tipX, tipY, rad_thick)
 end
 
 function utils.getFontListsForResolution()
@@ -849,7 +850,7 @@ function utils.box(x, y, w, h, title, titlepos, titlealign, titlefont, titlespac
         local value_str = tostring(displayValue) .. (unit or "")
 
         local value_str_calc = string.gsub(value_str, "[%%]", "W")
-        value_str_calc = string.gsub(value_str, "[°]", ".")
+        value_str_calc = string.gsub(value_str_calc, "[°]", ".")
 
         local valueFont, bestW, bestH = FONT_XXS, 0, 0
         if font and _G[font] then
@@ -945,8 +946,10 @@ function utils.transformValue(value, box)
     return value
 end
 
-function utils.setBackgroundColourBasedOnTheme()
-    local w, h = lcd.getWindowSize()
+function utils.setBackgroundColourBasedOnTheme(w, h)
+    if not (w and h) then
+        w, h = lcd.getWindowSize()
+    end
     local themeState = utils.getThemeState()
     lcd.color(themeState.pageBgColor or themeState.primaryBgColor or lcd.RGB(16, 16, 16))
     lcd.drawFilledRectangle(0, 0, w, h)
