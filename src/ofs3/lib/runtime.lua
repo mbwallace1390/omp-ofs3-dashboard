@@ -540,6 +540,7 @@ local function updateTimer()
         timer.start = nil
         timer.baseLifetime = (timer.baseLifetime or 0) + segment
         timer.lifetime = timer.baseLifetime
+        timer.live = timer.session
         saveTimerTotals()
     end
 end
