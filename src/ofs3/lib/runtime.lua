@@ -64,6 +64,7 @@ local lastStatsAt = 0
 local currentTelemetryType = nil
 local lastTelemetryAvailable = nil
 local channelSources = {}
+local channelRetryAt = {}
 local rxInitializedForProtocol = nil
 local telemetryActiveSource = nil
 local flightResetEventSrc = nil
@@ -231,6 +232,7 @@ local function initializeModel(modelKey)
     lastArmedRaw = nil
     lastStatsAt = 0
     channelSources = {}
+    channelRetryAt = {}
     rxInitializedForProtocol = nil
     telemetryActiveSource = nil
     resetFlightEventMonitor()
@@ -344,8 +346,11 @@ local function initializeRxMap(protocol)
     end
 
     channelSources = {}
+    channelRetryAt = {}
     rxInitializedForProtocol = protocol
 end
+
+local CHANNEL_SOURCE_RETRY_INTERVAL = 5
 
 local function updateRxValues(protocol)
     if protocol == nil or protocol == "sim" then
@@ -362,9 +367,17 @@ local function updateRxValues(protocol)
         return
     end
 
+    local now = os.clock()
     for name, member in pairs(map) do
         if channelSources[name] == nil and member ~= nil then
-            channelSources[name] = system.getSource({category = CATEGORY_CHANNEL, member = member, options = 0})
+            if not channelRetryAt[name] or now >= channelRetryAt[name] then
+                local source = system.getSource({category = CATEGORY_CHANNEL, member = member, options = 0})
+                if source then
+                    channelSources[name] = source
+                else
+                    channelRetryAt[name] = now + CHANNEL_SOURCE_RETRY_INTERVAL
+                end
+            end
         end
     end
 
