@@ -196,14 +196,16 @@ local function reloadTheme()
     forceFullRepaint = true
 end
 
-local function buildRects(module)
+local function buildRects(module, windowW, windowH)
     local utils = dashboard.utils
     local layout = module.layout or {}
     local headerLayout = module.header_layout or {}
     local boxes = type(module.boxes) == "function" and module.boxes() or (module.boxes or {})
     local headerBoxes = module.header_boxes or {}
 
-    local windowW, windowH = lcd.getWindowSize()
+    if not (windowW and windowH) then
+        windowW, windowH = lcd.getWindowSize()
+    end
     local isFullScreen = utils.isFullScreen(windowW, windowH)
 
     local cols = layout.cols or 1
@@ -273,7 +275,7 @@ local function buildRects(module)
     end
 end
 
-local function ensureState()
+local function ensureState(width, height)
     local nextState = ofs3.flightmode.current or "preflight"
     if nextState ~= currentState then
         currentState = nextState
@@ -282,14 +284,16 @@ local function ensureState()
         forceFullRepaint = true
     end
 
-    local width, height = lcd.getWindowSize()
+    if not (width and height) then
+        width, height = lcd.getWindowSize()
+    end
     local sizeKey = string.format("%dx%d", width, height)
     if sizeKey ~= lastSizeKey then
         lastSizeKey = sizeKey
         forceFullRepaint = true
     end
 
-    buildRects(loadedStates[currentState])
+    buildRects(loadedStates[currentState], width, height)
     return loadedStates[currentState]
 end
 
@@ -309,9 +313,13 @@ local function wakeObjects()
     return dirty
 end
 
-local function paintObjects()
+local function paintObjects(windowW, windowH)
+    if not (windowW and windowH) then
+        windowW, windowH = lcd.getWindowSize()
+    end
+
     local module = loadedStates[currentState]
-    dashboard.utils.setBackgroundColourBasedOnTheme()
+    dashboard.utils.setBackgroundColourBasedOnTheme(windowW, windowH)
 
     for _, rect in ipairs(dashboard.boxRects) do
         local object = dashboard.objectsByType[rect.box.type]
@@ -321,7 +329,6 @@ local function paintObjects()
     end
 
     if not ofs3.session.telemetryState and currentState ~= "postflight" then
-        local windowW, windowH = lcd.getWindowSize()
         local offsetY = 0
         if module.header_layout and dashboard.utils.isFullScreen(windowW, windowH) then
             offsetY = module.header_layout.height or 0
@@ -404,8 +411,9 @@ function dashboard.paint()
         return
     end
 
-    ensureState()
-    paintObjects()
+    local width, height = lcd.getWindowSize()
+    ensureState(width, height)
+    paintObjects(width, height)
     if dashboard.toolbar and dashboard.toolbar.draw then
         dashboard.toolbar.draw(dashboard)
     end
@@ -443,7 +451,7 @@ function dashboard.wakeup(widget)
         end
     end
 
-    ensureState()
+    ensureState(width, height)
 
     if dashboard.toolbarVisible and dashboard.toolbarLastActivityAt > 0 and (now - dashboard.toolbarLastActivityAt) >= TOOLBAR_TIMEOUT then
         dashboard.closeToolbar()

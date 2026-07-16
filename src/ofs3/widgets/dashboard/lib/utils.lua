@@ -945,8 +945,10 @@ function utils.transformValue(value, box)
     return value
 end
 
-function utils.setBackgroundColourBasedOnTheme()
-    local w, h = lcd.getWindowSize()
+function utils.setBackgroundColourBasedOnTheme(w, h)
+    if not (w and h) then
+        w, h = lcd.getWindowSize()
+    end
     local themeState = utils.getThemeState()
     lcd.color(themeState.pageBgColor or themeState.primaryBgColor or lcd.RGB(16, 16, 16))
     lcd.drawFilledRectangle(0, 0, w, h)
