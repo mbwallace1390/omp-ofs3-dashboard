@@ -849,7 +849,7 @@ function utils.box(x, y, w, h, title, titlepos, titlealign, titlefont, titlespac
         local value_str = tostring(displayValue) .. (unit or "")
 
         local value_str_calc = string.gsub(value_str, "[%%]", "W")
-        value_str_calc = string.gsub(value_str, "[°]", ".")
+        value_str_calc = string.gsub(value_str_calc, "[°]", ".")
 
         local valueFont, bestW, bestH = FONT_XXS, 0, 0
         if font and _G[font] then
