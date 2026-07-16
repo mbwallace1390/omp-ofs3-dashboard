@@ -9,7 +9,6 @@ local render = {}
 local utils = ofs3.widgets.dashboard.utils
 local getParam = utils.getParam
 local resolveThemeColor = utils.resolveThemeColor
-local prev = {}
 
 local function rotate(px, py, cx, cy, angle)
     local s = math.sin(angle)
@@ -35,7 +34,8 @@ function render.wakeup(box)
     local altitude = getSensor("altitude") or 20
     local groundspeed = getSensor("groundspeed") or 20
 
-    if prev.pitch ~= pitch or prev.roll ~= roll or prev.yaw ~= yaw then
+    local prev = box._last
+    if not prev or prev.pitch ~= pitch or prev.roll ~= roll or prev.yaw ~= yaw then
         box._dirty = true
     else
         box._dirty = false
