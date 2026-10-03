@@ -1,4 +1,6 @@
 *~
+/build/
+__pycache__/
 **/.DS_Store
 *.orig.png
 scripts/ofs3.zip

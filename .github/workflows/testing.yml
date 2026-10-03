@@ -25,6 +25,9 @@ jobs:
         with:
           python-version: "3.11"
 
+      - name: Install package validation runtime
+        run: python -m pip install -r tests/requirements.txt
+
       - name: Set build variables
         run: |
           echo "GIT_VER=${GITHUB_REF##*/}" >> "$GITHUB_ENV"
@@ -39,6 +42,12 @@ jobs:
             --version "${{ env.GIT_VER }}" \
             --artifact "$ART"
           echo "ARTIFACT=$ART" >> "$GITHUB_ENV"
+
+      - name: Validate install paths, translations, and packaged Lua
+        run: >-
+          python .github/scripts/validate_locale_package.py
+          "${{ env.ARTIFACT }}"
+          --lang "${{ matrix.lang }}" --version "${{ env.GIT_VER }}"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
